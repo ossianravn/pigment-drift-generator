@@ -13,11 +13,15 @@ const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getEleme
 const small = matchMedia('(max-width: 760px)').matches;
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+// Deep links: ?view=mobile|desktop picks the preview; ?open=export[:image|video|embed|config] opens the exporter.
+const query = new URLSearchParams(location.search);
+const viewParam = query.get('view');
+
 const store = new Store({
   config: initialConfig(),
   mode: reducedMotion ? 'still' : 'moving',
   phase: 0,
-  device: small ? 'mobile' : 'desktop',
+  device: viewParam === 'mobile' || viewParam === 'desktop' ? viewParam : small ? 'mobile' : 'desktop',
   panelOpen: !small,
   locked: new Set(),
 });
@@ -92,14 +96,14 @@ $('panelDone').addEventListener('click', () => store.set({ panelOpen: false }));
 
 // The export code (video encoder, zip) loads on first use to keep startup light.
 let exporter: Promise<import('./app/exportDialog').ExportDialog> | null = null;
-function openExport(): void {
+function openExport(tab?: string): void {
   exporter ??= import('./app/exportDialog').then((m) => new m.ExportDialog(store, toast));
-  exporter.then((e) => e.open()).catch(() => {
+  exporter.then((e) => e.open(tab as Parameters<typeof e.open>[0])).catch(() => {
     exporter = null;
     toast('Couldn’t load the exporter — check your connection and try again.');
   });
 }
-$('openExport').addEventListener('click', openExport);
+$('openExport').addEventListener('click', () => openExport());
 
 // ---------- segmented controls ----------
 function bindSeg(id: string, attr: string, onPick: (v: string) => void): HTMLButtonElement[] {
@@ -141,7 +145,7 @@ showPhase(0);
 
 // ---------- keyboard ----------
 addEventListener('keydown', (e) => {
-  const target = e.target as HTMLElement;
+  const target = e.target instanceof Element ? e.target : document.body;
   if (target.closest('input[type="text"], textarea, select, dialog[open]')) return;
   const mod = e.ctrlKey || e.metaKey;
   if (mod && e.key.toLowerCase() === 'z') {
@@ -176,6 +180,9 @@ $('stage').addEventListener('click', () => {
 matchMedia('(max-width: 760px)').addEventListener('change', (e) => {
   store.set({ device: e.matches ? 'mobile' : 'desktop', panelOpen: !e.matches });
 });
+
+const openParam = query.get('open');
+if (openParam?.startsWith('export')) openExport(openParam.split(':')[1]);
 
 // Re-layout once fonts settle (the dock height can change).
 document.fonts?.ready.then(() => stage.layout());

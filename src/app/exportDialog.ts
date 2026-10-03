@@ -2,6 +2,7 @@
 // a live embed, or a config/link — each with copy-paste code and a zip pack.
 
 import { type DriftConfig, parseConfigText } from '../engine/params';
+import { gzipSync, strToU8 } from 'fflate';
 import { download, fetchRuntime, formatBytes, type PackFile, zip } from '../export/bundle';
 import { canvasToBlob, renderToCanvas } from '../export/render';
 import { configJson, embedSnippet, examplePage, imageSnippet, readme, videoSnippet } from '../export/snippets';
@@ -74,7 +75,7 @@ export class ExportDialog {
   }
 
   open(tab?: Tab): void {
-    if (tab) this.tab = tab;
+    if (tab && ['image', 'video', 'embed', 'config'].includes(tab)) this.tab = tab;
     this.render();
     this.dialog.showModal();
   }
@@ -98,7 +99,7 @@ export class ExportDialog {
         <div class="sheet-body">
           <nav class="ex-tabs" role="tablist" aria-label="Export type">
             ${tabs.map((t) => `
-              <button role="tab" data-tab="${t.id}" aria-selected="${t.id === this.tab}">
+              <button role="tab" data-tab="${t.id}" aria-selected="${t.id === this.tab}"${t.id === this.tab ? ' autofocus' : ''}>
                 ${icon(t.icon, 22)}
                 <span><strong>${t.title}</strong><small>${t.sub}</small></span>
               </button>`).join('')}
@@ -198,9 +199,9 @@ export class ExportDialog {
           { id: 'webm', label: 'WebM · VP9' },
         ], 'Format')}
         ${this.select('vquality', this.opts.vquality, [
-          { id: 'light', label: 'Light — about 2 MB per 16s at 1080p' },
-          { id: 'balanced', label: 'Balanced — about 4.5 MB per 16s (recommended)' },
-          { id: 'high', label: 'High — about 9 MB per 16s, crisp grain' },
+          { id: 'light', label: 'Light · ~2 MB per 16s' },
+          { id: 'balanced', label: 'Balanced · ~4.5 MB per 16s' },
+          { id: 'high', label: 'High · ~9 MB per 16s, crisp grain' },
         ], 'Quality')}
         ${this.select('fps', String(this.opts.fps), [
           { id: '24', label: '24 fps — filmic, smaller' },
@@ -339,7 +340,7 @@ export class ExportDialog {
       fetchRuntime()
         .then((src) => {
           const el = d.querySelector('[data-runtime-size]');
-          if (el) el.textContent = `One ${formatBytes(src.length)} script (~${formatBytes(Math.round(src.length * 0.36))} gzipped)`;
+          if (el) el.textContent = `One ${formatBytes(src.length)} script (${formatBytes(gzipSync(strToU8(src)).length)} gzipped)`;
         })
         .catch(() => {});
     }

@@ -101,8 +101,8 @@ export class Stage {
       const emu = EMULATED[device];
       const small = this.small.matches;
       const panelW = !small && panelOpen ? Math.min(380, vw * 0.32) + 24 : 0;
-      const top = small ? 64 : 92;
-      const bottom = small ? 150 : 96;
+      const top = small ? 84 : 120;
+      const bottom = small ? 150 : 100;
       const availW = vw - panelW - 48;
       const availH = vh - top - bottom;
       const s = Math.min(availW / emu.width, availH / emu.height);

@@ -6,6 +6,8 @@
 
 *Pigment drift* is the slow change in hue you get when ink or watercolor pools, dries and shifts. It's technically a defect, but a lovely one. This generator paints that look on the GPU: layered washes that drift in hue, a lifted current winding through them, mist where the pigment dissolves into paper, granulation, feathered edges and brush relief.
 
+![The generator: a live piece in the mobile preview frame, with the control panel](docs/screenshot.webp)
+
 - **Tweak or randomize.** About 20 parameters grouped as Pigment, Composition, Current, Paper & texture and Motion. Lock any group, then hit Randomize (or roll the dice on a single group).
 - **Still or moving.** Every piece is a seamless loop. Pause on any moment for a still.
 - **Desktop and mobile.** Compositions adapt to any aspect ratio. Switch the preview to a phone (or, on a phone, to a desktop screen) to see both.

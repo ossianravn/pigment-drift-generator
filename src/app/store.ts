@@ -15,7 +15,9 @@ export interface AppState {
   locked: Set<GroupId>;
 }
 
-type Listener = (state: AppState, changed: Set<keyof AppState>) => void;
+/** 'history' fires when undo/redo availability may have changed. */
+export type Change = keyof AppState | 'history';
+type Listener = (state: AppState, changed: Set<Change>) => void;
 
 const HISTORY_LIMIT = 100;
 
@@ -39,8 +41,11 @@ export class Store {
   }
 
   set(patch: Partial<AppState>): void {
-    const changed = new Set(Object.keys(patch) as (keyof AppState)[]);
     this.state = { ...this.state, ...patch };
+    this.emit(new Set(Object.keys(patch) as (keyof AppState)[]));
+  }
+
+  private emit(changed: Set<Change>): void {
     this.listeners.forEach((fn) => fn(this.state, changed));
   }
 
@@ -64,6 +69,7 @@ export class Store {
     if (this.past.length > HISTORY_LIMIT) this.past.shift();
     this.future = [];
     this.committed = cur;
+    this.emit(new Set(['history']));
   }
 
   get canUndo(): boolean {
@@ -80,6 +86,7 @@ export class Store {
     this.future.push(this.state.config);
     this.committed = prev;
     this.set({ config: prev });
+    this.emit(new Set(['history']));
     this.scheduleUrlSync();
   }
 
@@ -89,13 +96,13 @@ export class Store {
     this.past.push(this.state.config);
     this.committed = next;
     this.set({ config: next });
+    this.emit(new Set(['history']));
     this.scheduleUrlSync();
   }
 
+  /** A clean link to this piece (no view/open query parameters). */
   shareUrl(): string {
-    const url = new URL(location.href);
-    url.hash = `c=${encodeConfig(this.state.config)}`;
-    return url.toString();
+    return `${location.origin}${location.pathname}#c=${encodeConfig(this.state.config)}`;
   }
 
   private scheduleUrlSync(): void {

@@ -85,7 +85,7 @@ export const RANGES: RangeSpec[] = [
   { key: 'riverWidth', group: 'current', label: 'Width', hint: 'Width of the current in the foreground', min: 0.02, max: 0.3, step: 0.005, random: [0.05, 0.16], format: fixed2 },
   { key: 'riverMeander', group: 'current', label: 'Meander', hint: 'How much it winds', min: 0, max: 1, step: 0.01, random: [0.3, 0.9], format: pct },
   { key: 'riverDepth', group: 'current', label: 'Position', hint: 'Where in the wash it runs (near ↔ far)', min: 0, max: 1, step: 0.01, random: [0.25, 0.7], format: pct },
-  { key: 'riverTilt', group: 'current', label: 'Tilt', hint: 'Angle of the current', min: -1, max: 1, step: 0.01, random: [-0.7, 0.7], format: fixed2 },
+  { key: 'riverTilt', group: 'current', label: 'Tilt', hint: 'Angle of the current', min: -1, max: 1, step: 0.01, random: [-0.45, 0.45], format: fixed2 },
 
   { key: 'granulation', group: 'texture', label: 'Granulation', hint: 'Pigment settling into the paper tooth', min: 0, max: 1, step: 0.01, random: [0.3, 0.8], format: pct },
   { key: 'grain', group: 'texture', label: 'Paper grain', hint: 'Fine texture of the paper itself', min: 0, max: 1, step: 0.01, random: [0.25, 0.7], format: pct },

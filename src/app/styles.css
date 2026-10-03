@@ -90,7 +90,7 @@ button:disabled { cursor: default; }
 .frame-label {
   position: absolute;
   left: 0; right: 0;
-  bottom: -34px;
+  top: -30px;
   text-align: center;
   font: 11px/1 var(--mono);
   letter-spacing: .08em;
@@ -234,6 +234,7 @@ button:disabled { cursor: default; }
   margin: 0 -22px;
   padding: 2px 22px 10px;
   scroll-snap-type: x proximity;
+  scroll-padding-inline: 22px;
   scrollbar-width: none;
 }
 .preset-row::-webkit-scrollbar { display: none; }
@@ -547,6 +548,7 @@ textarea { font: 12.5px/1.5 var(--mono); resize: vertical; }
 .actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 18px 0 6px; }
 .link { border: 0; background: none; color: var(--ink-2); text-decoration: underline; padding: 0 4px; font-size: 12.5px; }
 
+.progress[hidden] { display: none; }
 .progress { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 4px 12px; margin: 10px 0; }
 .progress i {
   grid-column: 1 / -1;
@@ -559,8 +561,8 @@ textarea { font: 12.5px/1.5 var(--mono); resize: vertical; }
 .progress span { font-size: 12.5px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
 
 .steps { counter-reset: step; list-style: none; padding: 0; margin: 18px 0 12px; display: grid; gap: 8px; }
-.steps li { counter-increment: step; display: grid; grid-template-columns: 26px 1fr; gap: 6px; color: var(--ink-2); }
-.steps li::before { content: counter(step) '.'; font: italic 20px/1 var(--serif); color: var(--accent); }
+.steps li { counter-increment: step; position: relative; padding-left: 30px; color: var(--ink-2); }
+.steps li::before { content: counter(step) '.'; position: absolute; left: 0; top: 0; font: italic 20px/1.1 var(--serif); color: var(--accent); }
 .steps code, .ex-intro code { font: 12.5px var(--mono); background: rgba(38, 33, 46, .07); padding: 1px 5px; border-radius: 5px; }
 
 .code { border-radius: 14px 11px 15px 12px / 12px 15px 11px 14px; background: #221d29; color: #efe7da; overflow: hidden; }
@@ -596,7 +598,7 @@ dialog.is-busy .ex-tabs { opacity: .5; }
   }
   .app[data-panel='closed'] .panel { transform: translateY(calc(100% + 30px)); }
   .panel-inner { padding: 6px 18px 20px; }
-  .preset-row { margin: 0 -18px; padding: 2px 18px 10px; }
+  .preset-row { margin: 0 -18px; padding: 2px 18px 10px; scroll-padding-inline: 18px; }
   .sheet-bar { display: flex; }
 
   .dock {
