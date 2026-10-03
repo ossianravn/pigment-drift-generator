@@ -12,8 +12,8 @@ export const EMULATED: Record<Device, { width: number; height: number }> = {
 };
 
 const SMALL_SCREEN = '(max-width: 760px)';
-/** Pixels drawn per frame while animating (~1600×1000). */
-const PIXEL_BUDGET = 1.6e6;
+/** Pixels drawn per frame while animating: ~1600×1000 on desktops, less on phones. */
+const PIXEL_BUDGET = { desktop: 1.6e6, phone: 0.9e6 };
 
 export class Stage {
   renderer: DriftRenderer | null = null;
@@ -127,7 +127,8 @@ export class Stage {
     const rect = this.frame.getBoundingClientRect();
     const dpr = Math.min(devicePixelRatio || 1, 2);
     const full = rect.width * rect.height * dpr * dpr;
-    const scale = hq ? 1 : Math.min(1, Math.sqrt(PIXEL_BUDGET / Math.max(1, full))) * this.quality;
+    const budget = this.small.matches ? PIXEL_BUDGET.phone : PIXEL_BUDGET.desktop;
+    const scale = hq ? 1 : Math.min(1, Math.sqrt(budget / Math.max(1, full))) * this.quality;
     this.renderer.setSize(rect.width * dpr * scale, rect.height * dpr * scale);
   }
 

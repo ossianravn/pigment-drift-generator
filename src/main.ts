@@ -1,5 +1,5 @@
 import './app/styles.css';
-import { luminance } from './engine/color';
+import { hexToOklab, luminance } from './engine/color';
 import { PRESETS, randomizeConfig } from './engine/palettes';
 import { createRng } from './engine/params';
 import { hydrateIcons, icon } from './app/icons';
@@ -126,13 +126,26 @@ function syncChrome(): void {
   ($('undo') as HTMLButtonElement).disabled = !store.canUndo;
   ($('redo') as HTMLButtonElement).disabled = !store.canRedo;
 
-  // The UI borrows its accent from the piece: the deepest pigment that still reads on paper.
-  const accent = [...config.colors].sort((a, b) => luminance(a) - luminance(b)).find((c) => luminance(c) < 0.2) ?? '#2a2433';
-  app.style.setProperty('--accent', accent);
   // When the page is dark (e.g. Night Ink), chrome over the canvas switches to light ink.
-  app.dataset.tone = luminance(config.paper) < 0.18 ? 'dark' : 'light';
+  const dark = luminance(config.paper) < 0.18;
+  app.dataset.tone = dark ? 'dark' : 'light';
+  app.style.setProperty('--accent', accentFor(config.colors, dark));
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', config.paper);
 }
+/**
+ * The UI borrows its accent from the piece: on light paper the deepest pigment;
+ * on dark paper the most vivid mid-tone, so buttons still stand out against the page.
+ * Either way white text on it stays readable.
+ */
+function accentFor(colors: string[], darkPaper: boolean): string {
+  if (!darkPaper) {
+    return [...colors].sort((a, b) => luminance(a) - luminance(b)).find((c) => luminance(c) < 0.2) ?? '#2a2433';
+  }
+  const chroma = (c: string) => Math.hypot(hexToOklab(c)[1], hexToOklab(c)[2]);
+  const mids = colors.filter((c) => luminance(c) >= 0.06 && luminance(c) <= 0.22);
+  return mids.sort((a, b) => chroma(b) - chroma(a))[0] ?? '#6a5fd8';
+}
+
 store.subscribe((state, changed) => {
   syncChrome();
   if (changed.has('phase') || changed.has('config')) {
