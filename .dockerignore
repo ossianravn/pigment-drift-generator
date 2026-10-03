@@ -1,0 +1,12 @@
+node_modules
+dist
+public/embed
+.git
+.github
+docs
+*.log
+.ref
+.claude
+lab.html
+src/lab.ts
+vite.lab.config.ts

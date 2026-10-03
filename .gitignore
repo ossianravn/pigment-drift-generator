@@ -1,0 +1,12 @@
+node_modules
+dist
+public/embed
+*.log
+.DS_Store
+.vite
+coverage
+.ref
+.claude
+lab.html
+src/lab.ts
+vite.lab.config.ts

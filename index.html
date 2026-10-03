@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Pigment Drift — watercolor backgrounds for the web</title>
+    <meta name="description" content="Generate still and moving watercolor “pigment drift” backgrounds. Tweak or randomize, then export as images, seamless video loops or a tiny live WebGL embed." />
+    <meta name="theme-color" content="#f4ede1" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:ital,opsz,wght@0,9..40,400..600;1,9..40,400&family=Instrument+Serif:ital@0;1&display=swap"
+    />
+  </head>
+  <body>
+    <!-- Shared SVG filters: a gentle wobble that makes borders look hand-drawn. -->
+    <svg class="defs" aria-hidden="true" width="0" height="0">
+      <filter id="rough" x="-5%" y="-5%" width="110%" height="110%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="2" seed="3" result="n" />
+        <feDisplacementMap in="SourceGraphic" in2="n" scale="2.6" xChannelSelector="R" yChannelSelector="G" />
+      </filter>
+      <filter id="rough-strong" x="-5%" y="-5%" width="110%" height="110%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.05" numOctaves="2" seed="8" result="n" />
+        <feDisplacementMap in="SourceGraphic" in2="n" scale="4" xChannelSelector="R" yChannelSelector="G" />
+      </filter>
+    </svg>
+
+    <main class="app" id="app" data-device="desktop" data-panel="open">
+      <div class="stage" id="stage">
+        <div class="frame" id="frame">
+          <canvas id="canvas" aria-label="Live pigment drift preview" role="img"></canvas>
+          <div class="frame-label" id="frameLabel"></div>
+        </div>
+        <p class="webgl-fallback" id="fallback" hidden>
+          This browser can’t run WebGL2, so the live preview is unavailable. Try a recent Chrome, Edge, Firefox or Safari.
+        </p>
+      </div>
+
+      <header class="topbar">
+        <a class="brand" href="/" aria-label="Pigment Drift home">
+          <span class="brand-word">Pigment <em>Drift</em></span>
+          <svg class="brand-underline" viewBox="0 0 160 10" aria-hidden="true"><path d="M2 6.5 C 28 3, 52 8.5, 82 5.2 S 132 3.4, 158 6" /></svg>
+          <span class="brand-sub">watercolor backgrounds for the web</span>
+        </a>
+        <div class="top-actions">
+          <div class="history">
+            <button class="icon-btn sketch" id="undo" title="Undo (Ctrl+Z)" aria-label="Undo"></button>
+            <button class="icon-btn sketch" id="redo" title="Redo (Ctrl+Shift+Z)" aria-label="Redo"></button>
+          </div>
+          <button class="btn sketch" id="randomize" title="Randomize (R)"><span class="ico" data-icon="dice"></span><span>Randomize</span></button>
+          <button class="btn btn-ink sketch" id="openExport"><span class="ico" data-icon="download"></span><span>Export</span></button>
+        </div>
+      </header>
+
+      <aside class="panel" id="panel" aria-label="Controls">
+        <div class="panel-inner" id="panelInner">
+          <div class="sheet-bar"><span class="grab" aria-hidden="true"></span><strong>Adjust</strong><button class="chip" type="button" id="panelDone">Done</button></div>
+          <section class="presets">
+            <h2 class="eyebrow">Start from</h2>
+            <div class="preset-row" id="presets"></div>
+          </section>
+          <div id="groups"></div>
+          <footer class="panel-foot">
+            <span>Open source ·</span>
+            <a href="https://github.com/ossianravn/pigment-drift-generator" target="_blank" rel="noopener">GitHub</a>
+          </footer>
+        </div>
+      </aside>
+
+      <div class="dock" id="dock">
+        <div class="dock-group sketch-box">
+          <div class="seg" role="radiogroup" aria-label="Still or moving" id="modeSeg">
+            <button role="radio" data-mode="still">Still</button>
+            <button role="radio" data-mode="moving">Moving</button>
+          </div>
+          <div class="timeline" id="timeline" title="Drag to choose the moment (used for still exports)">
+            <input type="range" id="phase" min="0" max="1" step="0.001" value="0" aria-label="Moment in the loop" />
+            <span class="time" id="timeLabel">0.0s</span>
+          </div>
+        </div>
+        <div class="dock-group sketch-box">
+          <div class="seg" role="radiogroup" aria-label="Preview device" id="deviceSeg">
+            <button role="radio" data-device="desktop"><span class="ico" data-icon="monitor"></span><span>Desktop</span></button>
+            <button role="radio" data-device="mobile"><span class="ico" data-icon="phone"></span><span>Mobile</span></button>
+          </div>
+        </div>
+        <div class="dock-group seed-box sketch-box">
+          <span class="seed-label">No.</span>
+          <span class="seed" id="seedLabel">0</span>
+          <button class="icon-btn" id="reseed" title="New seed, same settings (S)" aria-label="New seed"></button>
+        </div>
+        <button class="icon-btn sketch panel-toggle" id="panelToggle" title="Show / hide controls (H)" aria-label="Toggle controls"></button>
+      </div>
+
+      <dialog class="export" id="exportDialog" aria-labelledby="exportTitle"></dialog>
+      <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    </main>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
