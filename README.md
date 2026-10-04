@@ -104,7 +104,7 @@ docker run -p 8080:80 pigment-drift
 4. *Domains:* add your domain with container **port 80** and enable HTTPS.
 5. *Deploy.* Optionally turn on auto-deploy so pushes to `main` redeploy.
 
-Once deployed, the generator's *Live embed* tab can point snippets at `https://your-domain/embed/pigment-drift.min.js`.
+Once deployed, the generator's *Live embed* tab can point snippets at `https://your-domain/embed/pigment-drift.min.js`. Full settings: [docs/DEPLOY.md](docs/DEPLOY.md).
 
 ## Browser support
 
