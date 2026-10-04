@@ -1,45 +1,81 @@
-# Pigment Drift
+<div align="center">
 
-**Watercolor backgrounds for the web: still or moving, tweakable, and ready to drop into your site.**
+<a href="https://pigmentdrift.ossianravn.dev"><img src="docs/hero.webp" alt="An animated pigment drift: violet and ultramarine watercolor washes drifting slowly, with a pale current winding through them" width="100%"></a>
 
-![Six pigment drift pieces generated with the presets](docs/banner.webp)
+<h1>Pigment Drift</h1>
 
-*Pigment drift* is the slow change in hue you get when ink or watercolor pools, dries and shifts. It's technically a defect, but a lovely one. This generator paints that look on the GPU: layered washes that drift in hue, a lifted current winding through them, mist where the pigment dissolves into paper, granulation, feathered edges and brush relief.
+<p><strong>Watercolor backgrounds for the web.</strong><br>
+Still or moving, endlessly tweakable, and ready to drop into your site.</p>
 
-![The generator: a live piece in the mobile preview frame, with the control panel](docs/screenshot.webp)
+<p>
+<a href="https://pigmentdrift.ossianravn.dev"><img alt="Live demo" src="https://img.shields.io/badge/live%20demo-pigmentdrift.ossianravn.dev-6a4fd6?style=flat-square"></a>
+<a href="https://github.com/ossianravn/pigment-drift-generator/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/ossianravn/pigment-drift-generator/ci.yml?branch=main&style=flat-square&label=ci"></a>
+<a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-3446c9?style=flat-square"></a>
+<img alt="Embed runtime: about 10 KB gzipped" src="https://img.shields.io/badge/embed-~10%20KB%20gzipped-2a1a7a?style=flat-square">
+<img alt="Rendered with WebGL2" src="https://img.shields.io/badge/rendered%20with-WebGL2-b7a2ee?style=flat-square">
+</p>
 
-- **Tweak or randomize.** About 20 parameters grouped as Pigment, Composition, Current, Paper & texture and Motion. Lock any group, then hit Randomize (or roll the dice on a single group).
-- **Still or moving.** Every piece is a seamless loop. Pause on any moment for a still.
-- **Screensaver view.** Fullscreen and artwork-only, with the controls appearing only while you move the mouse.
-- **Desktop and mobile.** Compositions adapt to any aspect ratio. Switch the preview to a phone (or, on a phone, to a desktop screen) to see both.
-- **Easy export, with instructions.** Each export comes as a zip pack containing the files, copy-paste HTML/CSS, an `example.html` and a README.
-  - **Still image**: WebP / JPEG / PNG at retina sizes, with desktop and mobile versions.
-  - **Video loop**: frame-exact MP4 (H.264) or WebM (VP9), rendered in the browser, desktop and portrait.
-  - **Live embed**: a ~10 KB (gzipped) web component that renders the real thing on the visitor's GPU.
-  - **Config & link**: a few hundred bytes of JSON, or a share link that reopens the piece.
+<p>
+<a href="https://pigmentdrift.ossianravn.dev"><strong>Open the generator</strong></a> &nbsp;·&nbsp;
+<a href="#presets">Presets</a> &nbsp;·&nbsp;
+<a href="#use-it-on-your-site">Use it on your site</a> &nbsp;·&nbsp;
+<a href="#how-it-works">How it works</a> &nbsp;·&nbsp;
+<a href="#self-host">Self-host</a>
+</p>
 
-## Quick start
+</div>
 
-```bash
-npm install
-npm run dev
-```
+<br>
 
-Open the printed URL. Keyboard: <kbd>R</kbd> randomize · <kbd>S</kbd> new seed · <kbd>Space</kbd> still/moving · <kbd>F</kbd> screensaver · <kbd>H</kbd> hide controls · <kbd>E</kbd> export · <kbd>Ctrl/⌘ Z</kbd> undo. Double-click a slider to reset it.
+## What is pigment drift?
 
-**Screensaver**: the expand button (or <kbd>F</kbd>) goes fullscreen with only the artwork showing. Move the mouse or tap to bring back a slim dock with Exit; <kbd>Esc</kbd> also leaves. Open `/?screensaver` to start in that view (without fullscreen), which suits kiosks and second screens.
+*Pigment drift* is the slow, unintended shift in an ink's shade or hue as it pools, dries and settles. It's technically a defect, but one that became a style.
 
-```bash
-npm test          # unit tests (vitest)
-npm run typecheck # TypeScript
-npm run build     # production build in dist/
-```
+The idea comes from [David East's Twitter post](https://x.com/_davideast/status/2106194893810852153), which shared *pigment drift* as a term for generating backgrounds. This project turns that look into a procedural generator you can tweak, animate and export. Everything is painted live on the GPU: layered washes that drift in hue, a pale current winding through them, mist where pigment dissolves into paper, granulation, feathered edges and brush relief.
 
-## Using an export on your site
+## Presets
 
-All three formats use the same pattern: one element as the first thing inside `<body>`, fixed behind your content.
+<table>
+  <tr>
+    <td align="center" width="25%"><a href="https://pigmentdrift.ossianravn.dev/#c=eyJ2IjoxLCJzZWVkIjo0MTI3LCJwYXBlciI6IiNmZGYxZTMiLCJjb2xvcnMiOlsiIzJhMWE3YSIsIiMzNDQ2YzkiLCIjNmE0ZmQ2IiwiI2I3YTJlZSIsIiNmM2NmZGYiXSwiZGVuc2l0eSI6MC45NSwiaHVlRHJpZnQiOjAuNSwiYW5jaG9yIjoiYm90dG9tIiwiY292ZXJhZ2UiOjAuNTUsImxheWVycyI6NSwicmlkZ2UiOjAuNiwic2NhbGUiOjEsIndhcnAiOjAuNzUsIm1pc3QiOjAuNiwicml2ZXIiOjAuODUsInJpdmVyV2lkdGgiOjAuMDksInJpdmVyTWVhbmRlciI6MC42LCJyaXZlckRlcHRoIjowLjUsInJpdmVyVGlsdCI6MC4zNSwiZ3JhbnVsYXRpb24iOjAuNTUsImdyYWluIjowLjQ1LCJlZGdlIjowLjUsImZlYXRoZXIiOjAuNiwiYnJ1c2giOjAuNDUsIm1vdGlvbiI6MC40NSwiZmxvdyI6MC40NSwibG9vcCI6MTZ9"><img src="docs/presets/soft-current.webp" alt="Soft Current: violet and ultramarine with a pale current" width="100%"></a><br><sub><b>Soft Current</b></sub></td>
+    <td align="center" width="25%"><a href="https://pigmentdrift.ossianravn.dev/#c=eyJ2IjoxLCJzZWVkIjo5MDIxMSwicGFwZXIiOiIjZmRmMWUzIiwiY29sb3JzIjpbIiMzMzIyOGYiLCIjOGEzYWE4IiwiI2VmNGY2MyIsIiNmZjhhM2QiLCIjZmZjNzdhIl0sImRlbnNpdHkiOjAuOTUsImh1ZURyaWZ0IjowLjc1LCJhbmNob3IiOiJib3R0b20iLCJjb3ZlcmFnZSI6MC42LCJsYXllcnMiOjUsInJpZGdlIjowLjQ1LCJzY2FsZSI6MSwid2FycCI6MC45LCJtaXN0IjowLjYsInJpdmVyIjowLjgsInJpdmVyV2lkdGgiOjAuMTMsInJpdmVyTWVhbmRlciI6MC4zNSwicml2ZXJEZXB0aCI6MC40NSwicml2ZXJUaWx0IjotMC4yNSwiZ3JhbnVsYXRpb24iOjAuNTUsImdyYWluIjowLjQ1LCJlZGdlIjowLjUsImZlYXRoZXIiOjAuNiwiYnJ1c2giOjAuNDUsIm1vdGlvbiI6MC40NSwiZmxvdyI6MC40NSwibG9vcCI6MTZ9"><img src="docs/presets/ember-field.webp" alt="Ember Field: coral and orange over deep purple" width="100%"></a><br><sub><b>Ember Field</b></sub></td>
+    <td align="center" width="25%"><a href="https://pigmentdrift.ossianravn.dev/#c=eyJ2IjoxLCJzZWVkIjozMTMzNywicGFwZXIiOiIjZmRmMWUzIiwiY29sb3JzIjpbIiNjNDNhNWEiLCIjZjA1YTNhIiwiI2ZmOGYyZSIsIiNmZmI1NGEiLCIjZmZlMGE2Il0sImRlbnNpdHkiOjAuOTUsImh1ZURyaWZ0IjowLjYsImFuY2hvciI6ImJvdHRvbSIsImNvdmVyYWdlIjowLjUsImxheWVycyI6NCwicmlkZ2UiOjAuNSwic2NhbGUiOjEsIndhcnAiOjAuNiwibWlzdCI6MC42LCJyaXZlciI6MC45LCJyaXZlcldpZHRoIjowLjExLCJyaXZlck1lYW5kZXIiOjAuNzUsInJpdmVyRGVwdGgiOjAuNTUsInJpdmVyVGlsdCI6MC40NSwiZ3JhbnVsYXRpb24iOjAuNTUsImdyYWluIjowLjQ1LCJlZGdlIjowLjQsImZlYXRoZXIiOjAuNiwiYnJ1c2giOjAuNDUsIm1vdGlvbiI6MC40NSwiZmxvdyI6MC40NSwibG9vcCI6MTZ9"><img src="docs/presets/apricot-path.webp" alt="Apricot Path: apricot and vermilion with a winding path" width="100%"></a><br><sub><b>Apricot Path</b></sub></td>
+    <td align="center" width="25%"><a href="https://pigmentdrift.ossianravn.dev/#c=eyJ2IjoxLCJzZWVkIjoyNzE4LCJwYXBlciI6IiNmNWYyZWEiLCJjb2xvcnMiOlsiIzBiM2Y1NyIsIiMxNDcwN2YiLCIjM2Y5Yzk4IiwiIzkzY2RiOSIsIiNlMmVmZDYiXSwiZGVuc2l0eSI6MC45NSwiaHVlRHJpZnQiOjAuNSwiYW5jaG9yIjoiYm90dG9tIiwiY292ZXJhZ2UiOjAuNDgsImxheWVycyI6NiwicmlkZ2UiOjAuNywic2NhbGUiOjEsIndhcnAiOjAuNTUsIm1pc3QiOjAuNzUsInJpdmVyIjowLCJyaXZlcldpZHRoIjowLjA5LCJyaXZlck1lYW5kZXIiOjAuNiwicml2ZXJEZXB0aCI6MC41LCJyaXZlclRpbHQiOjAuMzUsImdyYW51bGF0aW9uIjowLjcsImdyYWluIjowLjQ1LCJlZGdlIjowLjUsImZlYXRoZXIiOjAuNiwiYnJ1c2giOjAuNDUsIm1vdGlvbiI6MC40NSwiZmxvdyI6MC40NSwibG9vcCI6MTZ9"><img src="docs/presets/sea-glass.webp" alt="Sea Glass: teal washes fading into mist" width="100%"></a><br><sub><b>Sea Glass</b></sub></td>
+  </tr>
+  <tr>
+    <td align="center" width="25%"><a href="https://pigmentdrift.ossianravn.dev/#c=eyJ2IjoxLCJzZWVkIjo2MDIyLCJwYXBlciI6IiNmNGVmZTQiLCJjb2xvcnMiOlsiIzI0MzMxZiIsIiM0NzVmMzMiLCIjN2Y4ZjRmIiwiI2M0YmY4NiIsIiNlYmRmYzQiXSwiZGVuc2l0eSI6MC45NSwiaHVlRHJpZnQiOjAuNSwiYW5jaG9yIjoiYm90dG9tIiwiY292ZXJhZ2UiOjAuNjIsImxheWVycyI6NiwicmlkZ2UiOjAuODUsInNjYWxlIjowLjg1LCJ3YXJwIjowLjc1LCJtaXN0IjowLjksInJpdmVyIjowLjYsInJpdmVyV2lkdGgiOjAuMDYsInJpdmVyTWVhbmRlciI6MC44NSwicml2ZXJEZXB0aCI6MC41LCJyaXZlclRpbHQiOi0wLjQsImdyYW51bGF0aW9uIjowLjU1LCJncmFpbiI6MC40NSwiZWRnZSI6MC41LCJmZWF0aGVyIjowLjYsImJydXNoIjowLjYsIm1vdGlvbiI6MC40NSwiZmxvdyI6MC40NSwibG9vcCI6MTZ9"><img src="docs/presets/moss-fog.webp" alt="Moss and Fog: olive hills with a narrow stream" width="100%"></a><br><sub><b>Moss &amp; Fog</b></sub></td>
+    <td align="center" width="25%"><a href="https://pigmentdrift.ossianravn.dev/#c=eyJ2IjoxLCJzZWVkIjoxNjE4LCJwYXBlciI6IiNmZmY0ZWUiLCJjb2xvcnMiOlsiIzVjMjE1MCIsIiNhMzQwNmYiLCIjZGI2ZjkzIiwiI2YyYWRiZiIsIiNmYmUwZDUiXSwiZGVuc2l0eSI6MC45NSwiaHVlRHJpZnQiOjAuMzUsImFuY2hvciI6InRvcCIsImNvdmVyYWdlIjowLjQyLCJsYXllcnMiOjQsInJpZGdlIjowLjQsInNjYWxlIjoxLCJ3YXJwIjoxLjEsIm1pc3QiOjAuNywicml2ZXIiOjAsInJpdmVyV2lkdGgiOjAuMDksInJpdmVyTWVhbmRlciI6MC42LCJyaXZlckRlcHRoIjowLjUsInJpdmVyVGlsdCI6MC4zNSwiZ3JhbnVsYXRpb24iOjAuNTUsImdyYWluIjowLjQ1LCJlZGdlIjowLjUsImZlYXRoZXIiOjAuODUsImJydXNoIjowLjQ1LCJtb3Rpb24iOjAuNDUsImZsb3ciOjAuNDUsImxvb3AiOjE2fQ"><img src="docs/presets/rose-quartz.webp" alt="Rose Quartz: plum and rose washes hanging from the top edge" width="100%"></a><br><sub><b>Rose Quartz</b></sub></td>
+    <td align="center" width="25%"><a href="https://pigmentdrift.ossianravn.dev/#c=eyJ2IjoxLCJzZWVkIjo0NjY5LCJwYXBlciI6IiNmNmY2ZjIiLCJjb2xvcnMiOlsiIzE0MjQ0YSIsIiMyODUzOGYiLCIjNWY5M2NmIiwiI2E5Y2RlYyIsIiNlNWVmZjYiXSwiZGVuc2l0eSI6MC45NSwiaHVlRHJpZnQiOjAuNSwiYW5jaG9yIjoiYm90dG9tIiwiY292ZXJhZ2UiOjAuNywibGF5ZXJzIjo3LCJyaWRnZSI6MC45LCJzY2FsZSI6MS4yNSwid2FycCI6MC40NSwibWlzdCI6MC42LCJyaXZlciI6MC43NSwicml2ZXJXaWR0aCI6MC4wNywicml2ZXJNZWFuZGVyIjowLjYsInJpdmVyRGVwdGgiOjAuMywicml2ZXJUaWx0IjowLjEsImdyYW51bGF0aW9uIjowLjY1LCJncmFpbiI6MC40NSwiZWRnZSI6MC42NSwiZmVhdGhlciI6MC42LCJicnVzaCI6MC40NSwibW90aW9uIjowLjQ1LCJmbG93IjowLjQ1LCJsb29wIjoxNn0"><img src="docs/presets/glacier.webp" alt="Glacier: icy blues with a bright current" width="100%"></a><br><sub><b>Glacier</b></sub></td>
+    <td align="center" width="25%"><a href="https://pigmentdrift.ossianravn.dev/#c=eyJ2IjoxLCJzZWVkIjo3Nzc3LCJwYXBlciI6IiMxMjEwMjAiLCJjb2xvcnMiOlsiI2ZmN2E4YSIsIiNiMjViZDYiLCIjNWI1ZmUwIiwiIzJjM2Y4ZiIsIiMxYzFhM2EiXSwiZGVuc2l0eSI6MC45LCJodWVEcmlmdCI6MC41LCJhbmNob3IiOiJib3R0b20iLCJjb3ZlcmFnZSI6MC41OCwibGF5ZXJzIjo1LCJyaWRnZSI6MC41NSwic2NhbGUiOjEsIndhcnAiOjAuOTUsIm1pc3QiOjAuNSwicml2ZXIiOjAuNywicml2ZXJXaWR0aCI6MC4wOCwicml2ZXJNZWFuZGVyIjowLjYsInJpdmVyRGVwdGgiOjAuNSwicml2ZXJUaWx0IjowLjM1LCJncmFudWxhdGlvbiI6MC41NSwiZ3JhaW4iOjAuMzUsImVkZ2UiOjAuMzUsImZlYXRoZXIiOjAuNiwiYnJ1c2giOjAuNDUsIm1vdGlvbiI6MC40NSwiZmxvdyI6MC40NSwibG9vcCI6MTZ9"><img src="docs/presets/night-ink.webp" alt="Night Ink: neon pink and indigo on dark paper" width="100%"></a><br><sub><b>Night Ink</b></sub></td>
+  </tr>
+</table>
 
-**Live embed**
+<p align="center"><sub>Click any piece to open it in the generator, or press <kbd>R</kbd> there for endless new ones.</sub></p>
+
+## Features
+
+<p align="center"><img src="docs/screenshot.webp" alt="The generator: a live piece in the mobile preview frame, next to the control panel" width="100%"></p>
+
+- **Tweak or randomize.** About 20 parameters across *Pigment, Composition, Current, Paper & texture* and *Motion*. Lock the groups you like, then randomize the rest, or roll the dice on a single group.
+- **Still or moving.** Every piece is a seamless loop. Pause on any moment to export it as a still.
+- **Desktop and mobile.** Compositions adapt to any aspect ratio. Flip the preview to a phone (or, on a phone, to a desktop screen) to check both.
+- **Screensaver view.** Fullscreen and artwork-only; the controls come back only while you move the mouse.
+- **Share links and undo.** The URL always holds the current piece; undo and redo cover every change.
+
+### Export, with instructions
+
+| Export | What you get | Good for |
+| --- | --- | --- |
+| **Still image** | WebP, JPEG or PNG at retina sizes, desktop and mobile | The lightest page, no script |
+| **Video loop** | Frame-exact MP4 (H.264) or WebM (VP9), desktop and portrait | Motion without JavaScript |
+| **Live embed** | A `<pigment-drift>` web component, about 10 KB gzipped | Crisp at any size, truly generative |
+| **Config & link** | A few hundred bytes of JSON, or a share link | Saving, versioning and sharing pieces |
+
+Each export downloads as a zip pack with the files, copy-paste HTML/CSS, an `example.html` and a README. Videos are rendered in your browser, frame by frame, so the last frame flows straight into the first.
+
+## Use it on your site
+
+Every format follows the same pattern: one element as the first thing inside `<body>`, fixed behind your content. Copy it from **Export** in the generator, or write it by hand:
 
 ```html
 <pigment-drift class="pd-bg" poster="pigment-drift-poster.webp"
@@ -51,71 +87,134 @@ All three formats use the same pattern: one element as the first thing inside `<
 </style>
 ```
 
+Behind a single section instead? Use `position: absolute`, and give the section `position: relative; isolation: isolate;`.
+
+The runtime pauses when the element is off-screen or the tab is hidden, and draws a single still for visitors who prefer reduced motion. It keeps animation within a pixel budget, recovers from WebGL context loss, and falls back to the poster image without WebGL2.
+
+<details>
+<summary><b>Element attributes</b></summary>
+<br>
+
 | Attribute | Default | What it does |
 | --- | --- | --- |
-| `config` | — | The piece, as JSON (copy it from the generator). Can also go in a child `<script type="application/json">`. |
+| `config` | — | The piece, as JSON. It can also go in a child `<script type="application/json">`. |
 | `poster` | — | Image shown until the first frame, and instead of the canvas if WebGL2 isn't available. |
 | `still` | off | Render one frame instead of animating. |
 | `phase` | `0` | Which moment of the loop to show when still (0–1). |
 | `fps` | `30` | Frame-rate cap while animating. |
 | `quality` | `0.75` | Render scale while animating (0.25–1). Stills always render at full resolution. |
-| `max-dpr` | `1.5` | Caps device pixel ratio. |
+| `max-dpr` | `1.5` | Caps the device pixel ratio. |
 
-The runtime pauses when the element is off-screen or the tab is hidden, draws a single still for visitors who prefer reduced motion, keeps animation inside a pixel budget, and recovers from WebGL context loss.
+</details>
 
-To mount it yourself instead: `const bg = PigmentDrift.mount(element, config, { fps: 30 })`, then `bg.update(newConfig)` or `bg.destroy()`.
+<details>
+<summary><b>JavaScript API</b></summary>
+<br>
 
-**Image or video**: the packs include ready-made HTML and CSS, including `<source media>` switching for portrait screens and a reduced-motion fallback for video.
+```js
+const bg = PigmentDrift.mount(document.querySelector('.hero'), config, { fps: 30, still: false });
+bg.update(newConfig);   // swap pieces without a reload
+bg.destroy();
+```
+
+</details>
+
+<details>
+<summary><b>Image and video packs</b></summary>
+<br>
+
+The packs include ready-made HTML and CSS: `background-image` with a portrait version for phones, or a muted, looping, inline `<video>` that switches to a portrait file with `<source media>` and shows the still to visitors who prefer reduced motion.
+
+</details>
+
+## Keyboard and links
+
+| Key | Action |
+| --- | --- |
+| <kbd>R</kbd> | Randomize |
+| <kbd>S</kbd> | New seed, same settings |
+| <kbd>Space</kbd> | Still / moving |
+| <kbd>F</kbd> | Screensaver |
+| <kbd>H</kbd> | Hide controls |
+| <kbd>E</kbd> | Export |
+| <kbd>Ctrl/⌘ Z</kbd> | Undo (add <kbd>Shift</kbd> to redo) |
+
+Double-click any slider to reset it.
+
+| Link | Opens |
+| --- | --- |
+| `#c=…` | A specific piece (every share link looks like this) |
+| `?view=mobile` | The phone preview |
+| `?screensaver` | The artwork-only view, for kiosks and second screens |
+| `?open=export:video` | The exporter on a tab: `image`, `video`, `embed` or `config` |
 
 ## How it works
 
-Everything is one fragment shader ([`src/engine/shader.ts`](src/engine/shader.ts)):
+Every pixel comes from one fragment shader ([`src/engine/shader.ts`](src/engine/shader.ts)), so the same code renders the editor preview, 4K stills, video frames and the embed.
 
-1. **Domain-warped noise** gives the wet-in-wet swirl. Warp strengths are kept below the point where space folds, since folds show up as hard creases.
-2. **A turbulent height field** (0 at the anchored edge, 1 at the horizon) is cut into **washes** painted back to front. Far washes are pale and soft, near ones deep and dense, with darker pooled rims.
-3. **Hue drift**: the colour index follows the height field plus a slow noise field, mixed in OKLab across a five-pigment ramp.
-4. **The current**: a meandering centreline with perspective (narrower towards the horizon), where pigment is lifted, with flowing streaks.
-5. **Paper**: mist, granulation, mottling, brush relief (lit via screen-space derivatives) and grain. Grain is sized in CSS pixels, so it looks the same on every screen and export size.
+1. **Domain-warped noise** gives the wet-in-wet swirl. Warp strengths stay below the point where space folds, since folds show up as hard creases.
+2. **A turbulent height field**, from the anchored edge to the horizon, is cut into **washes** painted back to front: pale and soft near the horizon, deep and dense up front, with darker pooled rims.
+3. **Hue drift**: each pixel's colour follows that height plus a slow noise field, mixed in OKLab across a five-pigment ramp.
+4. **The current** is a meandering path with perspective, where pigment is lifted away and streaks flow along it.
+5. **Paper**: mist, granulation, mottling, brush relief lit via screen-space derivatives, and grain sized in CSS pixels, so it looks the same on every screen and export size.
 
-**Seamless loops**: every time-varying input is driven by a point travelling once around a circle per loop, and the current's streaks use two cross-faded phases. Frame *N* is exactly frame 0, so video exports are frame-exact and loop without a seam.
+**Seamless loops**: every time-varying input is driven by a point travelling once around a circle per loop, and the current's streaks cross-fade between two phases. Frame *N* is exactly frame 0.
+
+<details>
+<summary><b>Project structure</b></summary>
+<br>
 
 ```
 src/
-  engine/     params schema, palettes, color math, shader, WebGL2 renderer (shared by everything)
-  app/        the generator UI: store + history, stage, control panel, export dialog
-  export/     tiled offscreen rendering, video encoding (mediabunny/WebCodecs), zip packs, snippets
-  embed/      the <pigment-drift> runtime → public/embed/pigment-drift.min.js
-tests/        vitest unit tests
+  engine/   parameter schema, palettes, color math, the shader, WebGL2 renderer
+  app/      the generator UI: store + history, stage, control panel, screensaver, export dialog
+  export/   tiled offscreen rendering, video encoding (WebCodecs via mediabunny), zip packs, snippets
+  embed/    the <pigment-drift> runtime → public/embed/pigment-drift.min.js
+tests/      vitest unit tests
 ```
 
-Every control, the randomizer, share links, exports and the embed all read one parameter schema ([`src/engine/params.ts`](src/engine/params.ts)), so adding a parameter there wires it up everywhere.
+Every control, the randomizer, share links, exports and the embed read one parameter schema ([`src/engine/params.ts`](src/engine/params.ts)), so a parameter added there is wired up everywhere.
 
-## Deploy (Docker / Dokploy)
+</details>
 
-The app is fully static: rendering happens in the visitor's browser. The included `Dockerfile` builds it and serves it with nginx (gzip, immutable caching for hashed assets, CORS on `/embed/` so the runtime can be hot-linked, `/healthz` for health checks).
+## Run it locally
+
+```bash
+npm install
+npm run dev        # the generator, with hot reload
+npm test           # unit tests
+npm run typecheck
+npm run build      # production build in dist/
+```
+
+## Self-host
+
+It's a static site: all rendering happens in the visitor's browser. The `Dockerfile` builds it and serves it with nginx, with gzip, immutable caching for hashed assets, CORS on `/embed/` so the runtime can be hot-linked, and `/healthz` for health checks.
 
 ```bash
 docker build -t pigment-drift .
 docker run -p 8080:80 pigment-drift
 ```
 
-**On Dokploy:**
-
-1. *Create Project → Create Service → Application.*
-2. *Provider:* GitHub → this repository, branch `main`.
-3. *Build Type:* **Dockerfile** (path `./Dockerfile`).
-4. *Domains:* add your domain with container **port 80** and enable HTTPS.
-5. *Deploy.* Optionally turn on auto-deploy so pushes to `main` redeploy.
-
-Once deployed, the generator's *Live embed* tab can point snippets at `https://your-domain/embed/pigment-drift.min.js`. Full settings: [docs/DEPLOY.md](docs/DEPLOY.md).
+On **Dokploy**, create an Application from this repository with Build Type **Dockerfile** and container port **80**, then add your domain with HTTPS. The full settings are in [docs/DEPLOY.md](docs/DEPLOY.md).
 
 ## Browser support
 
-The generator and the live embed need WebGL2: current Chrome, Edge, Firefox and Safari 15+. Video export uses WebCodecs: current Chrome, Edge, Safari 16.4+ and Firefox 130+. Exported images and videos work everywhere.
+| | Chrome / Edge | Firefox | Safari |
+| --- | --- | --- | --- |
+| Generator and live embed (WebGL2) | ✓ | ✓ | 15+ |
+| Video export (WebCodecs) | ✓ | 130+ | 16.4+ |
+| Exported images and videos | ✓ | ✓ | ✓ |
 
 ## Contributing
 
-Issues and pull requests are welcome. Please run `npm run typecheck && npm test` before opening a PR. For changes to the look, include before/after renders of a few presets.
+Issues and pull requests are welcome. Please run `npm run typecheck && npm test` before opening a PR, and for changes to the look, include before/after renders of a few presets.
+
+## Credits
+
+- **Inspiration:** [David East's Twitter post](https://x.com/_davideast/status/2106194893810852153) on *pigment drift*.
+- **Built with:** TypeScript, Vite and raw WebGL2, plus [mediabunny](https://github.com/Vanilagy/mediabunny) for video and [fflate](https://github.com/101arrowz/fflate) for zips.
+- **Type:** Instrument Serif, DM Sans and DM Mono.
 
 ## License
 
