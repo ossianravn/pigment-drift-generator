@@ -55,7 +55,7 @@ export const PRESETS: Preset[] = [
     riverMeander: 0.85, riverTilt: -0.4, brush: 0.6,
   }),
   preset('Rose Quartz', 'Rose Quartz', {
-    seed: 1618, anchor: 'top', coverage: 0.42, layers: 4, ridge: 0.4, warp: 1.1, mist: 0.7, river: 0,
+    seed: 1618, anchor: 'top', coverage: 0.58, layers: 4, ridge: 0.4, warp: 1.1, mist: 0.7, river: 0,
     feather: 0.85, hueDrift: 0.35,
   }),
   preset('Glacier', 'Glacier', {
