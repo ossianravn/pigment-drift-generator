@@ -10,6 +10,7 @@
 
 - **Tweak or randomize.** About 20 parameters grouped as Pigment, Composition, Current, Paper & texture and Motion. Lock any group, then hit Randomize (or roll the dice on a single group).
 - **Still or moving.** Every piece is a seamless loop. Pause on any moment for a still.
+- **Screensaver view.** Fullscreen and artwork-only, with the controls appearing only while you move the mouse.
 - **Desktop and mobile.** Compositions adapt to any aspect ratio. Switch the preview to a phone (or, on a phone, to a desktop screen) to see both.
 - **Easy export, with instructions.** Each export comes as a zip pack containing the files, copy-paste HTML/CSS, an `example.html` and a README.
   - **Still image**: WebP / JPEG / PNG at retina sizes, with desktop and mobile versions.
@@ -24,7 +25,9 @@ npm install
 npm run dev
 ```
 
-Open the printed URL. Keyboard: <kbd>R</kbd> randomize · <kbd>S</kbd> new seed · <kbd>Space</kbd> still/moving · <kbd>H</kbd> hide controls · <kbd>E</kbd> export · <kbd>Ctrl/⌘ Z</kbd> undo. Double-click a slider to reset it.
+Open the printed URL. Keyboard: <kbd>R</kbd> randomize · <kbd>S</kbd> new seed · <kbd>Space</kbd> still/moving · <kbd>F</kbd> screensaver · <kbd>H</kbd> hide controls · <kbd>E</kbd> export · <kbd>Ctrl/⌘ Z</kbd> undo. Double-click a slider to reset it.
+
+**Screensaver**: the expand button (or <kbd>F</kbd>) goes fullscreen with only the artwork showing. Move the mouse or tap to bring back a slim dock with Exit; <kbd>Esc</kbd> also leaves. Open `/?screensaver` to start in that view (without fullscreen), which suits kiosks and second screens.
 
 ```bash
 npm test          # unit tests (vitest)

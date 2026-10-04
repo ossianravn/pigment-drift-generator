@@ -62,7 +62,7 @@ export class Stage {
         this.renderer?.setConfig(state.config);
         this.invalidate();
       }
-      if (changed.has('device') || changed.has('panelOpen')) this.layout();
+      if (changed.has('device') || changed.has('panelOpen') || changed.has('immersive')) this.layout();
       if (changed.has('phase') || changed.has('mode')) this.invalidate();
     });
 
@@ -78,7 +78,7 @@ export class Stage {
   }
 
   get isFramed(): boolean {
-    return this.store.state.device !== this.nativeDevice;
+    return !this.store.state.immersive && this.store.state.device !== this.nativeDevice;
   }
 
   invalidate(): void {

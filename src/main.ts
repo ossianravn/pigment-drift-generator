@@ -4,6 +4,7 @@ import { PRESETS, randomizeConfig } from './engine/palettes';
 import { createRng } from './engine/params';
 import { hydrateIcons, icon } from './app/icons';
 import { Panel } from './app/panel';
+import { Screensaver } from './app/screensaver';
 import { Stage } from './app/stage';
 import { type Device, type Mode, Store, initialConfig } from './app/store';
 import { thumbnail } from './export/render';
@@ -13,7 +14,8 @@ const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getEleme
 const small = matchMedia('(max-width: 760px)').matches;
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-// Deep links: ?view=mobile|desktop picks the preview; ?open=export[:image|video|embed|config] opens the exporter.
+// Deep links: ?view=mobile|desktop picks the preview; ?open=export[:image|video|embed|config] opens the exporter;
+// ?screensaver starts in the artwork-only view (handy for kiosks and second screens).
 const query = new URLSearchParams(location.search);
 const viewParam = query.get('view');
 
@@ -24,6 +26,7 @@ const store = new Store({
   device: viewParam === 'mobile' || viewParam === 'desktop' ? viewParam : small ? 'mobile' : 'desktop',
   panelOpen: !small,
   locked: new Set(),
+  immersive: false,
 });
 
 // ---------- toast ----------
@@ -94,6 +97,9 @@ $('reseed').addEventListener('click', () => {
 $('panelToggle').addEventListener('click', () => store.set({ panelOpen: !store.state.panelOpen }));
 $('panelDone').addEventListener('click', () => store.set({ panelOpen: false }));
 
+const screensaver = new Screensaver(store, $('app'), $('dock'));
+$('screensaver').addEventListener('click', () => screensaver.toggle());
+
 // The export code (video encoder, zip) loads on first use to keep startup light.
 let exporter: Promise<import('./app/exportDialog').ExportDialog> | null = null;
 function openExport(tab?: string): void {
@@ -117,11 +123,17 @@ const deviceButtons = bindSeg('deviceSeg', 'device', (d) => store.set({ device: 
 // ---------- reflect state in chrome ----------
 const app = $('app');
 function syncChrome(): void {
-  const { config, mode, device, panelOpen } = store.state;
+  const { config, mode, device, panelOpen, immersive } = store.state;
   modeButtons.forEach((b) => b.setAttribute('aria-checked', String(b.dataset.mode === mode)));
   deviceButtons.forEach((b) => b.setAttribute('aria-checked', String(b.dataset.device === device)));
   app.dataset.panel = panelOpen ? 'open' : 'closed';
   app.dataset.mode = mode;
+  app.dataset.immersive = String(immersive);
+  const ss = $('screensaver');
+  ss.setAttribute('aria-pressed', String(immersive));
+  ss.title = immersive ? 'Back to the editor (Esc)' : 'Screensaver: fullscreen, artwork only (F)';
+  ss.setAttribute('aria-label', immersive ? 'Exit screensaver' : 'Screensaver');
+  ss.innerHTML = immersive ? `${icon('collapse')}<span>Exit</span>` : icon('expand');
   $('seedLabel').textContent = String(config.seed).padStart(4, '0');
   ($('undo') as HTMLButtonElement).disabled = !store.canUndo;
   ($('redo') as HTMLButtonElement).disabled = !store.canRedo;
@@ -181,6 +193,10 @@ addEventListener('keydown', (e) => {
     store.set({ mode: store.state.mode === 'moving' ? 'still' : 'moving' });
   } else if (e.key === 'e' || e.key === 'E') {
     openExport();
+  } else if (e.key === 'f' || e.key === 'F') {
+    screensaver.toggle();
+  } else if (e.key === 'Escape' && store.state.immersive) {
+    screensaver.exit();
   }
 });
 
@@ -193,6 +209,8 @@ $('stage').addEventListener('click', () => {
 matchMedia('(max-width: 760px)').addEventListener('change', (e) => {
   store.set({ device: e.matches ? 'mobile' : 'desktop', panelOpen: !e.matches });
 });
+
+if (query.has('screensaver')) screensaver.enter({ fullscreen: false });
 
 const openParam = query.get('open');
 if (openParam?.startsWith('export')) openExport(openParam.split(':')[1]);

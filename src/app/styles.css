@@ -632,3 +632,40 @@ dialog.is-busy .ex-tabs { opacity: .5; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; }
 }
+
+/* ---------- screensaver: artwork only; the dock returns while the pointer moves ---------- */
+
+.topbar { transition: opacity .5s ease, visibility 0s; }
+.dock { transition: right .45s cubic-bezier(.7, 0, .2, 1), opacity .5s ease, transform .5s ease; }
+.screensaver-btn span { display: none; }
+
+.app[data-immersive='true'] .topbar,
+.app[data-immersive='true'] .panel {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity .5s ease, visibility 0s .5s;
+}
+.app[data-immersive='true'] .device-group,
+.app[data-immersive='true'] .panel-toggle { display: none; }
+.app[data-immersive='true'] .dock,
+.app[data-immersive='true'][data-panel] .dock { left: 24px; right: 24px; opacity: 1; transform: none; }
+.app[data-immersive='true'] .dock > * { pointer-events: auto; }
+.app[data-immersive='true'] .screensaver-btn {
+  width: auto;
+  gap: 6px;
+  padding: 0 14px 0 11px;
+  background: var(--accent);
+  color: #fbf7f0;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  /* a paper ring keeps it visible over dark pigment */
+  box-shadow: 0 0 0 1.5px rgba(248, 243, 234, .9), 0 14px 30px -18px rgba(38, 28, 50, .6);
+}
+.app[data-immersive='true'] .screensaver-btn span { display: inline; }
+.app[data-immersive='true'][data-idle='true'] .dock,
+.app[data-immersive='true'][data-idle='true'][data-panel] .dock { opacity: 0; transform: translateY(14px); }
+.app[data-immersive='true'][data-idle='true'] .dock > * { pointer-events: none; }
+.app[data-immersive='true'][data-idle='true'],
+.app[data-immersive='true'][data-idle='true'] * { cursor: none; }

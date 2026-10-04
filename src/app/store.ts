@@ -13,6 +13,8 @@ export interface AppState {
   device: Device;
   panelOpen: boolean;
   locked: Set<GroupId>;
+  /** Screensaver: artwork only, full-bleed, controls hidden until the pointer moves. */
+  immersive: boolean;
 }
 
 /** 'history' fires when undo/redo availability may have changed. */
