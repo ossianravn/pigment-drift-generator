@@ -225,6 +225,9 @@ button:disabled { cursor: default; }
 .sheet-bar .grab { width: 44px; height: 4px; border-radius: 4px; background: var(--line-strong); position: absolute; left: 50%; top: 6px; transform: translateX(-50%); }
 .sheet-bar strong { font: italic 400 20px/1 var(--serif); margin-top: 8px; }
 .sheet-bar .chip { margin-top: 8px; }
+.master { margin: 2px 0 16px; padding-bottom: 12px; border-bottom: 1px dashed var(--line); }
+.master .ctl { margin-top: 2px; }
+.master .ctl-name { font: italic 400 19px/1 var(--serif); }
 .eyebrow { margin: 0 0 10px; font: 500 10.5px/1 var(--sans); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-2); }
 
 .preset-row {

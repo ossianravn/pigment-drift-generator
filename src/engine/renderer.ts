@@ -13,7 +13,7 @@ const ANCHOR_INDEX = { bottom: 0, top: 1, left: 2, right: 3 } as const;
 const FLOAT_UNIFORMS = [
   'coverage', 'ridge', 'scale', 'warp', 'mist', 'density', 'hueDrift',
   'river', 'riverWidth', 'riverMeander', 'riverDepth', 'riverTilt',
-  'granulation', 'grain', 'edge', 'feather', 'brush', 'motion', 'flow',
+  'granulation', 'grain', 'edge', 'feather', 'brush', 'motion', 'flow', 'opacity',
 ] as const;
 
 export interface DrawOptions {

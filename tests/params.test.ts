@@ -18,14 +18,20 @@ describe('schema', () => {
       const v = DEFAULT_CONFIG[spec.key];
       expect(v, spec.key).toBeGreaterThanOrEqual(spec.min);
       expect(v, spec.key).toBeLessThanOrEqual(spec.max);
+      if (!spec.random) continue;
       expect(spec.random[0], spec.key).toBeGreaterThanOrEqual(spec.min);
       expect(spec.random[1], spec.key).toBeLessThanOrEqual(spec.max);
     }
   });
 
-  it('every range belongs to a known group', () => {
-    const ids = new Set(GROUPS.map((g) => g.id));
+  it('every range belongs to a known group or the global controls', () => {
+    const ids = new Set<string>([...GROUPS.map((g) => g.id), 'global']);
     for (const spec of RANGES) expect(ids.has(spec.group), spec.key).toBe(true);
+  });
+
+  it('older configs without opacity open at full strength', () => {
+    const { opacity: _omit, ...legacy } = DEFAULT_CONFIG;
+    expect(sanitizeConfig({ ...legacy, opacity: undefined }).opacity).toBe(1);
   });
 });
 
@@ -95,10 +101,16 @@ describe('randomizeRanges', () => {
   it('leaves locked groups untouched', () => {
     const locked = new Set<GroupId>(['composition', 'texture']);
     const cfg = randomizeRanges(DEFAULT_CONFIG, locked, createRng(3));
-    for (const spec of RANGES.filter((r) => locked.has(r.group))) {
+    for (const spec of RANGES.filter((r) => r.group !== 'global' && locked.has(r.group))) {
       expect(cfg[spec.key], spec.key).toBe(DEFAULT_CONFIG[spec.key]);
     }
     expect(cfg.seed).toBe(DEFAULT_CONFIG.seed);
     expect(cfg.anchor).toBe(DEFAULT_CONFIG.anchor);
+  });
+
+  it('never changes opacity: it is a preference, not part of the look', () => {
+    const faded = { ...DEFAULT_CONFIG, opacity: 0.35 };
+    const rng = createRng(4);
+    for (let i = 0; i < 50; i++) expect(randomizeRanges(faded, new Set(), rng).opacity).toBe(0.35);
   });
 });

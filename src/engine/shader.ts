@@ -29,6 +29,7 @@ uniform float uDensity, uHueDrift;
 uniform float uRiver, uRiverWidth, uRiverMeander, uRiverDepth, uRiverTilt;
 uniform float uGranulation, uGrain, uEdge, uFeather, uBrush;
 uniform float uMotion, uFlow;
+uniform float uOpacity;   // fades the whole piece toward flat paper
 
 out vec4 fragColor;
 
@@ -277,7 +278,8 @@ void main() {
   col *= 1.0 + uGrain * (0.045 * grain + 0.018 * fiber);
   col *= 1.0 + uGrain * 0.03 * fbm(P * 1.4 + 40.0, 2);
 
-  vec3 outc = toSrgb(col);
+  // Opacity blends in sRGB like CSS opacity would, so 50% looks like half.
+  vec3 outc = mix(toSrgb(uPaper), toSrgb(col), uOpacity);
   outc += (hash12(frag) - 0.5) / 255.0;   // static dither: no banding, no video-bloating flicker
   fragColor = vec4(outc, 1.0);
 }

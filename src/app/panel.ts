@@ -37,6 +37,7 @@ export class Panel {
   private lockButtons = new Map<GroupId, HTMLButtonElement>();
 
   constructor(private store: Store, private thumbs: Map<string, string>) {
+    this.buildMaster();
     this.buildPresets();
     this.buildGroups();
     this.sync();
@@ -61,9 +62,19 @@ export class Panel {
       const src = this.thumbs.get(preset.name);
       if (src) img.src = src;
       btn.append(img, el('span', {}, preset.name));
-      btn.addEventListener('click', () => this.store.replaceConfig({ ...preset.config, loop: this.store.state.config.loop }));
+      // Presets change the look; loop length and opacity are your preferences, so they stay.
+      btn.addEventListener('click', () => {
+        const { loop, opacity } = this.store.state.config;
+        this.store.replaceConfig({ ...preset.config, loop, opacity });
+      });
       row.append(btn);
     }
+  }
+
+  /** Master controls (e.g. opacity) sit above everything, outside the randomizable groups. */
+  private buildMaster(): void {
+    const root = document.getElementById('master')!;
+    for (const spec of RANGES.filter((r) => r.group === 'global')) root.append(this.buildSlider(spec));
   }
 
   private buildGroups(): void {

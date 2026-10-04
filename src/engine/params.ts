@@ -8,6 +8,8 @@ export type Anchor = 'bottom' | 'top' | 'left' | 'right';
 export const ANCHORS: Anchor[] = ['bottom', 'top', 'left', 'right'];
 
 export type GroupId = 'palette' | 'composition' | 'current' | 'texture' | 'motion';
+/** Where a control lives: a named group, or 'global' — master controls at the top of the panel. */
+export type Placement = GroupId | 'global';
 
 export interface DriftConfig {
   v: 1;
@@ -39,6 +41,8 @@ export interface DriftConfig {
   flow: number;
   /** Seconds for one seamless animation loop. */
   loop: number;
+  /** How strongly the piece shows over the paper (1 = full, lower = faded toward the paper color). */
+  opacity: number;
 }
 
 export type NumericKey = {
@@ -47,14 +51,17 @@ export type NumericKey = {
 
 export interface RangeSpec {
   key: Exclude<NumericKey, 'v'>;
-  group: GroupId;
+  group: Placement;
   label: string;
   hint: string;
   min: number;
   max: number;
   step: number;
-  /** Range the randomizer draws from: narrower than min/max so results stay tasteful. */
-  random: [number, number];
+  /**
+   * Range the randomizer draws from: narrower than min/max so results stay tasteful.
+   * Omit it for preferences (like opacity) that Randomize should leave alone.
+   */
+  random?: [number, number];
   /** Formats the value for display. */
   format?: (v: number) => string;
 }
@@ -71,6 +78,8 @@ const pct = (v: number) => `${Math.round(v * 100)}`;
 const fixed2 = (v: number) => v.toFixed(2);
 
 export const RANGES: RangeSpec[] = [
+  { key: 'opacity', group: 'global', label: 'Opacity', hint: 'How strongly the piece shows over the paper. Lower it to sit quietly behind text.', min: 0.05, max: 1, step: 0.01, format: (v) => `${Math.round(v * 100)}%` },
+
   { key: 'density', group: 'palette', label: 'Density', hint: 'How much pigment is in the wash', min: 0.3, max: 1.3, step: 0.01, random: [0.75, 1.1], format: pct },
   { key: 'hueDrift', group: 'palette', label: 'Hue drift', hint: 'How far colors wander across the wash', min: 0, max: 1, step: 0.01, random: [0.25, 0.8], format: pct },
 
@@ -127,6 +136,7 @@ export const DEFAULT_CONFIG: DriftConfig = {
   motion: 0.45,
   flow: 0.45,
   loop: 16,
+  opacity: 1,
 };
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
@@ -231,7 +241,7 @@ export function randomizeRanges(
 ): DriftConfig {
   const out = { ...cfg, colors: [...cfg.colors] };
   for (const spec of RANGES) {
-    if (locked.has(spec.group)) continue;
+    if (!spec.random || (spec.group !== 'global' && locked.has(spec.group))) continue;
     const [lo, hi] = spec.random;
     out[spec.key] = round(clamp(snap(lo + (hi - lo) * rand(), spec.step), spec.min, spec.max), 4);
   }
