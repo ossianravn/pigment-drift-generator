@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { hexToRgb, isHex, linearToSrgb, normalizeHex, oklchToHex, rgbToHex, srgbToLinear } from '../src/engine/color';
-import { generatePalette, PALETTES, PRESETS, randomizeConfig } from '../src/engine/palettes';
+import { hexToRgb, isHex, linearToSrgb, luminance, normalizeHex, oklchToHex, rgbToHex, srgbToLinear } from '../src/engine/color';
+import { generatePalette, isDarkPalette, LIBRARY, PALETTES, PRESETS, randomizeConfig } from '../src/engine/palettes';
 import { createRng, DEFAULT_CONFIG, RANGES, sanitizeConfig } from '../src/engine/params';
 import { FRAGMENT_SHADER } from '../src/engine/shader';
 
@@ -30,6 +30,25 @@ describe('palettes & presets', () => {
       expect(isHex(p.paper), p.name).toBe(true);
       expect(p.colors, p.name).toHaveLength(5);
       p.colors.forEach((c) => expect(isHex(c), p.name).toBe(true));
+    }
+  });
+
+  it('palettes are uniquely named and the library lists each exactly once', () => {
+    const names = PALETTES.map((p) => p.name);
+    expect(new Set(names).size).toBe(names.length);
+    expect([...LIBRARY.map((p) => p.name)].sort()).toEqual([...names].sort());
+  });
+
+  it('every preset is painted with one of the palettes', () => {
+    for (const preset of PRESETS) {
+      const match = PALETTES.find((p) => p.paper === preset.config.paper && p.colors.join() === preset.config.colors.join());
+      expect(match, preset.name).toBeDefined();
+    }
+  });
+
+  it('dark palettes keep their horizon pigment close to the paper', () => {
+    for (const p of PALETTES.filter(isDarkPalette)) {
+      expect(luminance(p.colors[4]), p.name).toBeLessThan(0.05);
     }
   });
 

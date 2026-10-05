@@ -259,6 +259,8 @@ button:disabled { cursor: default; }
   padding: 2px 22px 10px;
   scroll-snap-type: x proximity;
   scroll-padding-inline: 22px;
+  /* soft edges hint that the row keeps going */
+  mask-image: linear-gradient(to right, transparent, #000 18px, #000 calc(100% - 26px), transparent);
   scrollbar-width: none;
 }
 .preset-row::-webkit-scrollbar { display: none; }
@@ -368,6 +370,9 @@ input[type='range']:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 1px 
 .dab-legend .arrow { font-style: normal; opacity: .7; }
 .mini-actions { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 8px; }
 .library { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; margin-bottom: 4px; }
+.library:not(.is-open) .swatch-strip.extra { display: none; }
+.library-more { margin: 4px 0 6px; }
+.library-more small { font: 11px var(--mono); color: var(--ink-3); }
 .swatch-strip {
   display: flex;
   height: 20px;
@@ -640,6 +645,8 @@ dialog.is-busy .ex-tabs { opacity: .5; }
   .library { display: flex; gap: 8px; overflow-x: auto; margin: 2px -16px 0; padding: 4px 16px 6px; scrollbar-width: none; }
   .library::-webkit-scrollbar { display: none; }
   .swatch-strip { flex: none; width: 116px; height: 28px; }
+  .library:not(.is-open) .swatch-strip.extra { display: flex; }
+  .library-more { display: none; }
 
   .sheet-bar { display: flex; align-items: center; gap: 4px; position: relative; margin: 0 0 4px; padding: 16px 0 2px; background: none; }
   .sheet-bar strong { margin: 0 auto 0 0; font-size: 21px; }

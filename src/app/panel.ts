@@ -5,7 +5,7 @@
 // dragging a slider turns the panel to glass: only that slider stays on screen.
 
 import { ANCHORS, type Anchor, DEFAULT_CONFIG, GROUPS, type GroupId, RANGES, type RangeSpec } from '../engine/params';
-import { PALETTES, PRESETS, randomPalette, randomizeConfig } from '../engine/palettes';
+import { LIBRARY, LIBRARY_PREVIEW, PRESETS, randomPalette, randomizeConfig } from '../engine/palettes';
 import { icon } from './icons';
 import type { Store } from './store';
 
@@ -103,6 +103,15 @@ export class Panel {
       });
       row.append(btn);
     }
+    // A mouse wheel scrolls the row sideways; at either end it hands back to the panel.
+    row.addEventListener('wheel', (e) => {
+      if (Math.abs(e.deltaY) <= Math.abs(e.deltaX) || row.scrollWidth <= row.clientWidth) return;
+      const atStart = row.scrollLeft <= 0 && e.deltaY < 0;
+      const atEnd = row.scrollLeft + row.clientWidth >= row.scrollWidth - 1 && e.deltaY > 0;
+      if (atStart || atEnd) return;
+      row.scrollLeft += e.deltaY;
+      e.preventDefault();
+    }, { passive: false });
   }
 
   /** Master controls (e.g. opacity) sit above everything, outside the randomizable groups. */
@@ -202,15 +211,28 @@ export class Panel {
     actions.append(shuffle, reverse);
     colors.append(actions);
 
-    const library = el('div', { class: 'library', 'data-key': 'palettes' });
-    for (const p of PALETTES) {
-      const b = el('button', { class: 'swatch-strip', type: 'button', title: p.name, 'aria-label': `Palette ${p.name}` });
+    // Desktop shows a varied first few with "More palettes"; phones scroll through them all.
+    const libraryWrap = el('div', { class: 'library-wrap', 'data-key': 'palettes' });
+    const library = el('div', { class: 'library' });
+    LIBRARY.forEach((p, i) => {
+      const b = el('button', { class: `swatch-strip${i >= LIBRARY_PREVIEW ? ' extra' : ''}`, type: 'button', title: p.name, 'aria-label': `Palette ${p.name}` });
       b.style.setProperty('--paper', p.paper);
       b.innerHTML = p.colors.map((c) => `<i style="background:${c}"></i>`).join('');
       b.addEventListener('click', () => this.store.setConfig({ paper: p.paper, colors: [...p.colors] }));
       library.append(b);
-    }
-    wrap.append(colors, library);
+    });
+    const more = el('button', { class: 'chip library-more', type: 'button', 'aria-expanded': 'false' }) as HTMLButtonElement;
+    const extra = LIBRARY.length - LIBRARY_PREVIEW;
+    const label = (open: boolean) => (more.innerHTML = open ? '<span>Fewer palettes</span>' : `<span>More palettes</span><small>${extra}</small>`);
+    label(false);
+    more.addEventListener('click', () => {
+      const open = !library.classList.contains('is-open');
+      library.classList.toggle('is-open', open);
+      more.setAttribute('aria-expanded', String(open));
+      label(open);
+    });
+    libraryWrap.append(library, more);
+    wrap.append(colors, libraryWrap);
     return wrap;
   }
 
