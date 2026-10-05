@@ -153,6 +153,7 @@ button:disabled { cursor: default; }
 .btn-ink { background: var(--accent); color: #fbf7f0; }
 .btn-ink::before { border-color: rgba(0, 0, 0, .35); }
 .btn .ico, .btn .icon { display: grid; place-items: center; }
+a.btn { color: inherit; text-decoration: none; }
 
 .icon-btn {
   display: inline-grid;
@@ -615,7 +616,7 @@ dialog.is-busy .ex-tabs { opacity: .5; }
   .history { display: none; }
   .top-actions { gap: 8px; }
   .top-actions .btn { padding: 0 12px; height: 38px; }
-  #randomize span:last-child { display: none; }
+  #randomize span:last-child, #openPaint span:last-child { display: none; }
 
   /* One control at a time: a short card instead of a tall sheet, so the art stays visible. */
   .panel {

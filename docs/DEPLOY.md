@@ -49,6 +49,7 @@ Check:
 
 - `https://pigmentdrift.ossianravn.dev/healthz` → `ok` (the container health check uses this too).
 - The generator opens and animates.
+- `https://pigmentdrift.ossianravn.dev/paint/` opens the paint studio (`/paint` redirects there).
 
 The embed script is not served from this server. Sites self-host it or load it from jsDelivr (see the README).
 

@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Pigment Drift — paint with your fingers</title>
+    <meta name="description" content="Paint in the pigment drift style with a mouse or your fingers: drop pigment and watch it bloom, stir the water, blot it back to paper." />
+    <meta name="theme-color" content="#fdf1e3" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:ital,opsz,wght@0,9..40,400..600;1,9..40,400&family=Instrument+Serif:ital@0;1&display=swap"
+    />
+  </head>
+  <body>
+    <svg class="defs" aria-hidden="true" width="0" height="0">
+      <filter id="rough" x="-5%" y="-5%" width="110%" height="110%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="2" seed="3" result="n" />
+        <feDisplacementMap in="SourceGraphic" in2="n" scale="2.6" xChannelSelector="R" yChannelSelector="G" />
+      </filter>
+      <filter id="rough-strong" x="-5%" y="-5%" width="110%" height="110%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.05" numOctaves="2" seed="8" result="n" />
+        <feDisplacementMap in="SourceGraphic" in2="n" scale="4" xChannelSelector="R" yChannelSelector="G" />
+      </filter>
+    </svg>
+
+    <main class="app studio" id="app" data-tone="light" data-sheet="closed">
+      <canvas class="paper" id="canvas" role="img" aria-label="Painting surface. Tap to drop pigment, drag to paint, hold to let a drop bloom."></canvas>
+      <div class="brush-ring" id="ring" aria-hidden="true"></div>
+      <p class="webgl-fallback" id="fallback" hidden>
+        This browser can’t run the paint studio (it needs WebGL2 with float textures). Try a recent Chrome, Edge, Firefox or Safari.
+      </p>
+
+      <header class="studio-top">
+        <a class="brand" href="/" id="brand" title="Back to the generator">
+          <span class="brand-word">Pigment <em>Drift</em></span>
+          <svg class="brand-underline" viewBox="0 0 160 10" aria-hidden="true"><path d="M2 6.5 C 28 3, 52 8.5, 82 5.2 S 132 3.4, 158 6" /></svg>
+          <span class="brand-sub">paint with your fingers</span>
+        </a>
+        <div class="studio-actions">
+          <a class="btn sketch to-generator" id="toGenerator" href="/" title="Back to the generator"><span class="ico" data-icon="sliders"></span><span>Generator</span></a>
+          <div class="studio-history">
+            <button class="icon-btn sketch" id="undo" title="Undo (Ctrl+Z)" aria-label="Undo"><span class="ico" data-icon="undo"></span></button>
+            <button class="icon-btn sketch" id="redo" title="Redo (Ctrl+Shift+Z)" aria-label="Redo"><span class="ico" data-icon="redo"></span></button>
+          </div>
+          <button class="btn sketch" id="sheetToggle" aria-controls="sheet" aria-expanded="false" title="Palette, paper and a new sheet (P)">
+            <span class="ico" data-icon="palette"></span><span>Paper</span>
+          </button>
+          <button class="btn btn-ink sketch" id="save" title="Save the painting as an image (Ctrl+S)"><span class="ico" data-icon="download"></span><span>Save</span></button>
+        </div>
+      </header>
+
+      <p class="studio-hint" id="hint" hidden>
+        <span><b>Tap</b> to drop pigment</span><span><b>drag</b> to paint</span><span><b>hold</b> to let it bloom</span>
+      </p>
+
+      <div class="studio-dock sketch-box" id="dock" role="toolbar" aria-label="Brushes">
+        <div class="pans" id="pans" role="radiogroup" aria-label="Pigments"></div>
+        <span class="dock-rule" aria-hidden="true"></span>
+        <div class="tools" role="radiogroup" aria-label="Water and blotting">
+          <button class="tool" role="radio" data-tool="water" title="Water: stir and push the pigment around (W)" aria-label="Water"><span class="ico" data-icon="drop"></span></button>
+          <button class="tool" role="radio" data-tool="lift" title="Blot: lift pigment back off the paper (B)" aria-label="Blot"><span class="ico" data-icon="blot"></span></button>
+        </div>
+        <span class="dock-rule" aria-hidden="true"></span>
+        <button class="tool size" id="size" title="Brush size ([ and ])" aria-label="Brush size"><i></i></button>
+      </div>
+
+      <aside class="studio-sheet" id="sheet" aria-label="Palette and paper">
+        <div class="studio-sheet-inner">
+          <div class="studio-sheet-head">
+            <strong>Palette &amp; <em>paper</em></strong>
+            <button class="chip" type="button" id="sheetDone">Done</button>
+          </div>
+          <section class="studio-section">
+            <h2 class="eyebrow">Palette</h2>
+            <div class="library is-open" id="library"></div>
+            <div class="mini-actions">
+              <button class="chip" type="button" id="surprise"><span class="ico" data-icon="dice" data-size="15"></span>Surprise me</button>
+            </div>
+          </section>
+          <section class="studio-section">
+            <h2 class="eyebrow">Water &amp; paper</h2>
+            <div id="sliders"></div>
+          </section>
+          <section class="studio-section">
+            <h2 class="eyebrow">New sheet</h2>
+            <div class="mini-actions">
+              <button class="chip" type="button" id="newBlank">Blank paper</button>
+              <button class="chip" type="button" id="newDrift">A fresh drift</button>
+              <button class="chip" type="button" id="newPiece" hidden>Your generator piece</button>
+            </div>
+            <p class="studio-note">Starting over is one undo away.</p>
+          </section>
+          <footer class="panel-foot">
+            <a href="/" id="backLink">← Back to the generator</a>
+            <span>·</span>
+            <a href="https://github.com/ossianravn/pigment-drift-generator" target="_blank" rel="noopener">GitHub</a>
+          </footer>
+        </div>
+      </aside>
+
+      <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    </main>
+
+    <script type="module" src="/src/paint/main.ts"></script>
+  </body>
+</html>

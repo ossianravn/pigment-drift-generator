@@ -1,7 +1,8 @@
 import './app/styles.css';
-import { hexToOklab, luminance } from './engine/color';
+import { luminance } from './engine/color';
 import { PRESETS, randomizeConfig } from './engine/palettes';
-import { createRng } from './engine/params';
+import { createRng, encodeConfig } from './engine/params';
+import { accentFor } from './app/accent';
 import { hydrateIcons, icon } from './app/icons';
 import { Panel } from './app/panel';
 import { Screensaver } from './app/screensaver';
@@ -111,6 +112,11 @@ function openExport(tab?: string): void {
 }
 $('openExport').addEventListener('click', () => openExport());
 
+// The paint studio picks up the piece you're looking at.
+const paintLink = $<HTMLAnchorElement>('openPaint');
+const paintHref = () => `/paint/#from=${encodeConfig(store.state.config)}`;
+for (const ev of ['pointerenter', 'focus', 'pointerdown', 'click']) paintLink.addEventListener(ev, () => (paintLink.href = paintHref()));
+
 // ---------- segmented controls ----------
 function bindSeg(id: string, attr: string, onPick: (v: string) => void): HTMLButtonElement[] {
   const buttons = [...$(id).querySelectorAll<HTMLButtonElement>('button')];
@@ -152,19 +158,6 @@ function syncChrome(): void {
   app.style.setProperty('--accent', accentFor(config.colors, dark));
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', config.paper);
 }
-/**
- * The UI borrows its accent from the piece: on light paper the deepest pigment;
- * on dark paper the most vivid mid-tone, so buttons still stand out against the page.
- * Either way white text on it stays readable.
- */
-function accentFor(colors: string[], darkPaper: boolean): string {
-  if (!darkPaper) {
-    return [...colors].sort((a, b) => luminance(a) - luminance(b)).find((c) => luminance(c) < 0.2) ?? '#2a2433';
-  }
-  const chroma = (c: string) => Math.hypot(hexToOklab(c)[1], hexToOklab(c)[2]);
-  const mids = colors.filter((c) => luminance(c) >= 0.06 && luminance(c) <= 0.22);
-  return mids.sort((a, b) => chroma(b) - chroma(a))[0] ?? '#6a5fd8';
-}
 
 store.subscribe((state, changed) => {
   syncChrome();
@@ -201,6 +194,8 @@ addEventListener('keydown', (e) => {
     store.set({ mode: store.state.mode === 'moving' ? 'still' : 'moving' });
   } else if (e.key === 'e' || e.key === 'E') {
     openExport();
+  } else if (e.key === 'p' || e.key === 'P') {
+    location.href = paintHref();
   } else if (e.key === 'f' || e.key === 'F') {
     screensaver.toggle();
   } else if (e.key === 'Escape' && store.state.immersive) {

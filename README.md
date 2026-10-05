@@ -17,6 +17,7 @@ Still or moving, endlessly tweakable, and ready to drop into your site.</p>
 
 <p>
 <a href="https://pigmentdrift.ossianravn.dev"><strong>Open the generator</strong></a> &nbsp;·&nbsp;
+<a href="https://pigmentdrift.ossianravn.dev/paint/"><strong>Paint with your fingers</strong></a> &nbsp;·&nbsp;
 <a href="#presets">Presets</a> &nbsp;·&nbsp;
 <a href="#use-it-on-your-site">Use it on your site</a> &nbsp;·&nbsp;
 <a href="#how-it-works">How it works</a> &nbsp;·&nbsp;
@@ -79,6 +80,26 @@ The idea comes from [David East's Twitter post](https://x.com/_davideast/status/
 | **Config & link** | A few hundred bytes of JSON, or a share link | Saving, versioning and sharing pieces |
 
 Each export downloads as a zip pack with the files, copy-paste HTML/CSS, an `example.html` and a README. Videos are rendered in your browser, frame by frame, so the last frame flows straight into the first.
+
+## Paint with your fingers
+
+<p align="center"><a href="https://pigmentdrift.ossianravn.dev/paint/"><img src="docs/paint.webp" alt="A painting made in the studio: coral and violet hills stirred into a curling wave, under a ringed sun combed into a marbled swirl" width="100%"></a></p>
+
+**[The paint studio](https://pigmentdrift.ossianravn.dev/paint/)** is a quieter, separate place to make pigment drift by hand, with a mouse, a pen or your fingers. There are no parameters to tune: pick a pigment and touch the paper.
+
+| Gesture | What happens |
+| --- | --- |
+| **Tap** | A drop of pigment blooms and pushes the washes around it outward. Tap the same spot with other pigments for suminagashi-style rings. |
+| **Hold** | The drop keeps growing for as long as you hold. |
+| **Drag** | A brush stroke. Wet edges bleed, then dry into the same stacked washes, darker rims and granulation as the generator. |
+| **Water** | Stir and comb the floating pigment into marbled folds, or tap to drop clear water. |
+| **Blot** | Lifts pigment back off the paper. |
+
+Several fingers work at once, and pens report pressure. While you paint, the tools fade back so nothing sits between you and the paper.
+
+- **Start from a piece.** *Paint* in the generator opens the studio with the piece you were looking at, so you can put your fingers into the pattern itself.
+- **Palette & paper.** Switch palettes at any time and the whole painting recolors. Set how many washes it dries into, how far wet pigment bleeds, how much the dried painting breathes, the edges and the paper texture.
+- **Nothing to lose.** Undo covers every gesture, and the painting stays in your browser between visits. **Save** downloads a PNG, or opens the share sheet on a phone.
 
 ## Use it on your site
 
@@ -153,9 +174,22 @@ The packs include ready-made HTML and CSS: `background-image` with a portrait ve
 | <kbd>F</kbd> | Screensaver |
 | <kbd>H</kbd> | Hide controls |
 | <kbd>E</kbd> | Export |
+| <kbd>P</kbd> | Paint this piece in the studio |
 | <kbd>Ctrl/⌘ Z</kbd> | Undo (add <kbd>Shift</kbd> to redo) |
 
 Double-click any slider to reset it.
+
+In the paint studio:
+
+| Key | Action |
+| --- | --- |
+| <kbd>1</kbd>–<kbd>5</kbd> | Pigments, deepest to palest |
+| <kbd>W</kbd> / <kbd>B</kbd> | Water / blot |
+| <kbd>[</kbd> <kbd>]</kbd> | Brush size (or the mouse wheel) |
+| <kbd>P</kbd> | Palette & paper |
+| <kbd>H</kbd> | Hide everything but the painting |
+| <kbd>Ctrl/⌘ S</kbd> | Save as PNG |
+| <kbd>Ctrl/⌘ Z</kbd> | Undo (add <kbd>Shift</kbd> to redo) |
 
 | Link | Opens |
 | --- | --- |
@@ -163,6 +197,7 @@ Double-click any slider to reset it.
 | `?view=mobile` | The phone preview |
 | `?screensaver` | The artwork-only view, for kiosks and second screens |
 | `?open=export:video` | The exporter on a tab: `image`, `video`, `embed` or `config` |
+| `/paint/` | The paint studio (`?open=paper` opens its palette sheet, `?blank` starts on bare paper) |
 
 ## How it works
 
@@ -176,6 +211,13 @@ Every pixel comes from one fragment shader ([`src/engine/shader.ts`](src/engine/
 
 **Seamless loops**: every time-varying input is driven by a point travelling once around a circle per loop, and the current's streaks cross-fade between two phases. Frame *N* is exactly frame 0.
 
+**The paint studio** ([`src/paint/`](src/paint/)) keeps a *pigment field* on the GPU: how much pigment lies on each spot of paper, and how wet it is.
+
+- A small stable-fluids simulation moves the field: advection, vorticity confinement and a pressure solve. Resampling is sharpened Catmull-Rom, so folds stay crisp.
+- Drops use the area-preserving map from mathematical marbling, which squeezes everything around them into rings.
+- Wet pigment creeps outward along the paper fibers while its core keeps its colour.
+- The render pass cuts the field into washes with the generator's stack, colour ramp and paper, so whatever you paint dries into the same style. *Paint this* in the generator converts the piece's height field into pigment.
+
 <details>
 <summary><b>Project structure</b></summary>
 <br>
@@ -186,6 +228,8 @@ src/
   app/      the generator UI: store + history, stage, control panel, screensaver, export dialog
   export/   tiled offscreen rendering, video encoding (WebCodecs via mediabunny), zip packs, snippets
   embed/    the <pigment-drift> runtime source
+  paint/    the paint studio: pigment field, fluid sim, brushes, its own UI
+paint/      the studio's page, served at /paint/
 embed/      the built runtime (committed; jsDelivr serves it from version tags)
 tests/      vitest unit tests
 ```
@@ -198,7 +242,7 @@ Every control, the randomizer, share links, exports and the embed read one param
 
 ```bash
 npm install
-npm run dev        # the generator, with hot reload
+npm run dev        # the generator (and the studio at /paint/), with hot reload
 npm test           # unit tests
 npm run typecheck
 npm run build      # production build in dist/
@@ -220,6 +264,7 @@ On **Dokploy**, create an Application from this repository with Build Type **Doc
 | | Chrome / Edge | Firefox | Safari |
 | --- | --- | --- | --- |
 | Generator and live embed (WebGL2) | ✓ | ✓ | 15+ |
+| Paint studio (WebGL2 with float render targets) | ✓ | ✓ | 15+ |
 | Video export (WebCodecs) | ✓ | 130+ | 16.4+ |
 | Exported images and videos | ✓ | ✓ | ✓ |
 
