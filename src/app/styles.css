@@ -221,6 +221,27 @@ button:disabled { cursor: default; }
   scrollbar-color: var(--line) transparent;
 }
 
+.chips { display: none; }
+
+/* Glass while you paint: dragging a slider fades everything but that slider. */
+.panel { transition: transform .45s cubic-bezier(.7, 0, .2, 1), opacity .3s ease, background-color .2s ease, box-shadow .2s ease; }
+.panel::before { transition: opacity .2s ease; }
+.ghosted { opacity: 0 !important; pointer-events: none !important; transition: opacity .18s ease !important; }
+.app[data-scrub='true'] .panel { background: transparent; box-shadow: none; }
+.app[data-scrub='true'] .panel::before { opacity: 0; }
+.app[data-scrub='true'] .topbar,
+.app[data-scrub='true'] .dock { opacity: 0; pointer-events: none; transition: opacity .18s ease; }
+.ctl.is-scrubbing { position: relative; isolation: isolate; }
+.ctl.is-scrubbing::before {
+  content: '';
+  position: absolute;
+  inset: -10px -14px -6px;
+  z-index: -1;
+  border-radius: 16px 13px 17px 12px / 13px 17px 12px 16px;
+  background: var(--paper-card) var(--grain);
+  box-shadow: 0 14px 34px -14px rgba(30, 20, 40, .5), 0 0 0 1px var(--line);
+}
+
 .sheet-bar { display: none; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 2; margin: 0 -18px 4px; padding: 8px 12px 6px 18px; background: linear-gradient(var(--paper-solid) 70%, transparent); }
 .sheet-bar .grab { width: 44px; height: 4px; border-radius: 4px; background: var(--line-strong); position: absolute; left: 50%; top: 6px; transform: translateX(-50%); }
 .sheet-bar strong { font: italic 400 20px/1 var(--serif); margin-top: 8px; }
@@ -589,20 +610,68 @@ dialog.is-busy .ex-tabs { opacity: .5; }
   .top-actions .btn { padding: 0 12px; height: 38px; }
   #randomize span:last-child { display: none; }
 
+  /* One control at a time: a short card instead of a tall sheet, so the art stays visible. */
   .panel {
     top: auto;
     left: 8px;
     right: 8px;
-    bottom: 8px;
+    bottom: calc(8px + env(safe-area-inset-bottom, 0px));
     width: auto;
     min-width: 0;
-    height: min(64dvh, 560px);
+    height: auto;
     border-radius: 22px 24px 18px 20px / 20px 22px 18px 24px;
   }
   .app[data-panel='closed'] .panel { transform: translateY(calc(100% + 30px)); }
-  .panel-inner { padding: 6px 18px 20px; }
-  .preset-row { margin: 0 -18px; padding: 2px 18px 10px; scroll-padding-inline: 18px; }
-  .sheet-bar { display: flex; }
+  .panel-inner { position: relative; inset: auto; overflow: visible; padding: 0 16px 12px; }
+  .panel-section:not(.has-active),
+  .panel [data-key]:not(.is-active),
+  .group-head, .rule, .panel-foot, .dab-legend, .presets .eyebrow { display: none; }
+  .master { margin: 0; padding: 0; border: 0; }
+  .master .ctl-name { font: inherit; }
+  .group { padding: 0; }
+  .ctl { margin: 2px 0 0; }
+  .anchor-ctl { margin-top: 6px; }
+  .palette { margin: 4px 0 0; }
+  .mini-actions { margin: 10px 0 2px; }
+  .preset-row { margin: 0 -16px; padding: 2px 16px 4px; scroll-padding-inline: 16px; }
+  .library { display: flex; gap: 8px; overflow-x: auto; margin: 2px -16px 0; padding: 4px 16px 6px; scrollbar-width: none; }
+  .library::-webkit-scrollbar { display: none; }
+  .swatch-strip { flex: none; width: 116px; height: 28px; }
+
+  .sheet-bar { display: flex; align-items: center; gap: 4px; position: relative; margin: 0 0 4px; padding: 16px 0 2px; background: none; }
+  .sheet-bar strong { margin: 0 auto 0 0; font-size: 21px; }
+  .sheet-bar .chip { margin: 0 0 0 4px; }
+  .sheet-tools { display: flex; gap: 0; }
+  .sheet-tools[hidden] { display: none; }
+  .peek { display: inline-grid; }
+
+  .chips {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    overflow-x: auto;
+    margin: 12px -16px 0;
+    padding: 2px 16px 2px;
+    scrollbar-width: none;
+    mask-image: linear-gradient(to right, transparent, #000 16px, #000 calc(100% - 16px), transparent);
+  }
+  .chips::-webkit-scrollbar { display: none; }
+  .chips button {
+    flex: none;
+    height: 32px;
+    padding: 0 12px;
+    border: 1px solid var(--line);
+    border-radius: 16px 13px 17px 12px / 13px 17px 12px 16px;
+    background: transparent;
+    color: var(--ink-2);
+    font-size: 13px;
+    white-space: nowrap;
+  }
+  .chips button[aria-pressed='true'] { background: var(--ink); border-color: var(--ink); color: var(--paper-solid); }
+  .chip-sep { flex: none; padding: 0 1px 0 8px; font: italic 16px/1 var(--serif); color: var(--accent); }
+
+  /* Hold-to-peek steps the card aside. */
+  .app[data-peek='true'] .panel { opacity: 0; transform: translateY(24px); }
 
   .dock {
     left: 10px;

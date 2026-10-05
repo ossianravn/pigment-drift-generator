@@ -1,4 +1,8 @@
 // Builds the control panel from the parameter schema and keeps it in sync with the store.
+//
+// Desktop shows every control in a side panel. Phones show one control at a time in
+// a short card, picked from a rail of chips, so the artwork stays visible. Everywhere,
+// dragging a slider turns the panel to glass: only that slider stays on screen.
 
 import { ANCHORS, type Anchor, DEFAULT_CONFIG, GROUPS, type GroupId, RANGES, type RangeSpec } from '../engine/params';
 import { PALETTES, PRESETS, randomPalette, randomizeConfig } from '../engine/palettes';
@@ -22,6 +26,15 @@ const DAB_SHAPES = [
   '45% 55% 50% 50% / 50% 46% 54% 50%',
 ];
 
+/** Controls that aren't sliders but get their own chip on phones. */
+const EXTRA_CONTROLS: Partial<Record<GroupId, { key: string; label: string }[]>> = {
+  palette: [
+    { key: 'colors', label: 'Colors' },
+    { key: 'palettes', label: 'Palettes' },
+  ],
+  composition: [{ key: 'anchor', label: 'Anchor' }],
+};
+
 const el = <K extends keyof HTMLElementTagNameMap>(tag: K, attrs: Record<string, string> = {}, html = '') => {
   const node = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
@@ -35,11 +48,22 @@ export class Panel {
   private paperInput!: HTMLInputElement;
   private anchorButtons = new Map<Anchor, HTMLButtonElement>();
   private lockButtons = new Map<GroupId, HTMLButtonElement>();
+  private app = document.getElementById('app')!;
+  private inner = document.getElementById('panelInner')!;
+  private chips = new Map<string, HTMLButtonElement>();
+  /** Which control a phone shows; desktop ignores it. */
+  private active = 'presets';
+  private sheetDice!: HTMLButtonElement;
+  private sheetLock!: HTMLButtonElement;
+  private scrubTimer = 0;
 
   constructor(private store: Store, private thumbs: Map<string, string>) {
     this.buildMaster();
     this.buildPresets();
     this.buildGroups();
+    this.buildChips();
+    this.buildSheetBar();
+    this.focus(this.active);
     this.sync();
     store.subscribe((_, changed) => {
       if (changed.has('config')) this.sync();
@@ -53,6 +77,8 @@ export class Panel {
       if (src) img.src = src;
     });
   }
+
+  // ---------- building ----------
 
   private buildPresets(): void {
     const row = document.getElementById('presets')!;
@@ -80,24 +106,13 @@ export class Panel {
   private buildGroups(): void {
     const root = document.getElementById('groups')!;
     for (const group of GROUPS) {
-      const section = el('section', { class: 'group', 'data-group': group.id });
+      const section = el('section', { class: 'group panel-section', 'data-group': group.id });
       const head = el('header', { class: 'group-head' });
       head.innerHTML = `<h2><span class="numeral">${group.numeral}.</span> ${group.title}</h2>`;
       const tools = el('div', { class: 'group-tools' });
-      const dice = el('button', { class: 'icon-btn small', type: 'button', title: `Randomize ${group.title.toLowerCase()} only`, 'aria-label': `Randomize ${group.title}` }, icon('dice', 16));
-      dice.addEventListener('click', () => {
-        const locked = new Set(GROUPS.map((g) => g.id).filter((id) => id !== group.id));
-        this.store.replaceConfig(randomizeConfig(this.store.state.config, locked));
-      });
-      const lock = el('button', { class: 'icon-btn small lock', type: 'button', 'aria-pressed': 'false' }) as HTMLButtonElement;
-      lock.addEventListener('click', () => {
-        const locked = new Set(this.store.state.locked);
-        if (locked.has(group.id)) locked.delete(group.id);
-        else locked.add(group.id);
-        this.store.set({ locked });
-      });
+      const lock = this.lockButton(group.id);
       this.lockButtons.set(group.id, lock);
-      tools.append(dice, lock);
+      tools.append(this.diceButton(() => group.id, group.title), lock);
       head.append(tools);
       section.append(head);
 
@@ -111,8 +126,37 @@ export class Panel {
     this.syncLocks();
   }
 
+  private diceButton(group: () => GroupId | null, title?: string): HTMLButtonElement {
+    const b = el('button', { class: 'icon-btn small', type: 'button' }, icon('dice', 16)) as HTMLButtonElement;
+    if (title) {
+      b.title = `Randomize ${title.toLowerCase()} only`;
+      b.setAttribute('aria-label', `Randomize ${title}`);
+    }
+    b.addEventListener('click', () => {
+      const id = group();
+      if (!id) return;
+      const locked = new Set(GROUPS.map((g) => g.id).filter((g) => g !== id));
+      this.store.replaceConfig(randomizeConfig(this.store.state.config, locked));
+    });
+    return b;
+  }
+
+  private lockButton(group: GroupId | (() => GroupId | null)): HTMLButtonElement {
+    const b = el('button', { class: 'icon-btn small lock', type: 'button', 'aria-pressed': 'false' }) as HTMLButtonElement;
+    b.addEventListener('click', () => {
+      const id = typeof group === 'function' ? group() : group;
+      if (!id) return;
+      const locked = new Set(this.store.state.locked);
+      if (locked.has(id)) locked.delete(id);
+      else locked.add(id);
+      this.store.set({ locked });
+    });
+    return b;
+  }
+
   private buildPalette(): HTMLElement {
     const wrap = el('div', { class: 'palette' });
+    const colors = el('div', { class: 'palette-colors', 'data-key': 'colors' });
     const dabs = el('div', { class: 'dabs' });
     const make = (label: string, shape: string, onInput: (v: string) => void) => {
       const lab = el('label', { class: 'dab', title: label });
@@ -127,19 +171,17 @@ export class Panel {
     for (let i = 0; i < 5; i++) {
       const label = i === 0 ? 'Foreground pigment' : i === 4 ? 'Horizon pigment' : `Pigment ${i + 1}`;
       this.dabs.push(make(label, DAB_SHAPES[i], (v) => {
-        const colors = [...this.store.state.config.colors];
-        colors[i] = v;
-        this.store.setConfig({ colors }, false);
+        const next = [...this.store.state.config.colors];
+        next[i] = v;
+        this.store.setConfig({ colors: next }, false);
       }));
     }
     const paperWrap = el('div', { class: 'paper-pick' });
     this.paperInput = make('Paper', DAB_SHAPES[5], (v) => this.store.setConfig({ paper: v }, false));
     paperWrap.append(this.paperInput.parentElement!, el('span', {}, 'paper'));
     dabs.append(paperWrap);
-    wrap.append(dabs);
-
-    const legend = el('div', { class: 'dab-legend' }, '<span>foreground</span><span class="arrow">⟶</span><span>horizon</span>');
-    wrap.append(legend);
+    colors.append(dabs);
+    colors.append(el('div', { class: 'dab-legend' }, '<span>foreground</span><span class="arrow">⟶</span><span>horizon</span>'));
 
     const actions = el('div', { class: 'mini-actions' });
     const shuffle = el('button', { class: 'chip', type: 'button' }, `${icon('shuffle', 14)}<span>New palette</span>`);
@@ -150,9 +192,9 @@ export class Panel {
     const reverse = el('button', { class: 'chip', type: 'button', title: 'Swap foreground and horizon pigments' }, '<span>Reverse</span>');
     reverse.addEventListener('click', () => this.store.setConfig({ colors: [...this.store.state.config.colors].reverse() }));
     actions.append(shuffle, reverse);
-    wrap.append(actions);
+    colors.append(actions);
 
-    const library = el('div', { class: 'library' });
+    const library = el('div', { class: 'library', 'data-key': 'palettes' });
     for (const p of PALETTES) {
       const b = el('button', { class: 'swatch-strip', type: 'button', title: p.name, 'aria-label': `Palette ${p.name}` });
       b.style.setProperty('--paper', p.paper);
@@ -160,12 +202,12 @@ export class Panel {
       b.addEventListener('click', () => this.store.setConfig({ paper: p.paper, colors: [...p.colors] }));
       library.append(b);
     }
-    wrap.append(library);
+    wrap.append(colors, library);
     return wrap;
   }
 
   private buildAnchor(): HTMLElement {
-    const wrap = el('div', { class: 'ctl anchor-ctl' });
+    const wrap = el('div', { class: 'ctl anchor-ctl', 'data-key': 'anchor' });
     wrap.append(el('span', { class: 'ctl-name' }, 'Anchored to'));
     const seg = el('div', { class: 'anchor-seg', role: 'radiogroup', 'aria-label': 'Anchored edge' });
     for (const a of ANCHORS) {
@@ -179,7 +221,7 @@ export class Panel {
   }
 
   private buildSlider(spec: RangeSpec): HTMLElement {
-    const lab = el('label', { class: 'ctl', title: spec.hint });
+    const lab = el('label', { class: 'ctl', title: spec.hint, 'data-key': spec.key });
     const head = el('span', { class: 'ctl-head' });
     head.append(el('span', { class: 'ctl-name' }, spec.label));
     const out = el('output') as HTMLOutputElement;
@@ -193,12 +235,113 @@ export class Panel {
     }) as HTMLInputElement;
     input.addEventListener('input', () => this.store.setConfig({ [spec.key]: Number(input.value) }, false));
     input.addEventListener('change', () => this.store.commit());
+    input.addEventListener('pointerdown', () => this.startScrub(lab));
     // Double-click resets to the default.
     input.addEventListener('dblclick', () => this.store.setConfig({ [spec.key]: DEFAULT_CONFIG[spec.key] }));
     lab.append(head, input);
     this.sliders.set(spec.key, { input, out, spec });
     return lab;
   }
+
+  /** The phone rail: every control as a chip, grouped by section numerals. */
+  private buildChips(): void {
+    const rail = document.getElementById('chips')!;
+    const add = (key: string, label: string) => {
+      const b = el('button', { type: 'button', 'data-target': key, 'aria-pressed': 'false' }, label) as HTMLButtonElement;
+      b.addEventListener('click', () => this.focus(key));
+      this.chips.set(key, b);
+      rail.append(b);
+    };
+    add('presets', 'Presets');
+    for (const spec of RANGES.filter((r) => r.group === 'global')) add(spec.key, spec.label);
+    for (const group of GROUPS) {
+      rail.append(el('span', { class: 'chip-sep', title: group.title, 'aria-hidden': 'true' }, `${group.numeral}.`));
+      for (const extra of EXTRA_CONTROLS[group.id] ?? []) add(extra.key, extra.label);
+      for (const spec of RANGES.filter((r) => r.group === group.id)) {
+        add(spec.key, group.id === 'current' && spec.key === 'river' ? 'Current' : spec.label);
+      }
+    }
+  }
+
+  private buildSheetBar(): void {
+    const tools = document.getElementById('sheetTools')!;
+    const activeGroup = () => this.activeGroup();
+    this.sheetDice = this.diceButton(activeGroup);
+    this.sheetLock = this.lockButton(activeGroup);
+    tools.append(this.sheetDice, this.sheetLock);
+
+    // Hold to peek: the card steps aside while the button is held.
+    const peek = document.getElementById('peek')!;
+    peek.innerHTML = icon('eye', 18);
+    peek.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      peek.setPointerCapture(e.pointerId);
+      this.app.dataset.peek = 'true';
+    });
+    const unpeek = () => (this.app.dataset.peek = 'false');
+    peek.addEventListener('pointerup', unpeek);
+    peek.addEventListener('pointercancel', unpeek);
+    peek.addEventListener('lostpointercapture', unpeek);
+    this.syncLocks();
+  }
+
+  // ---------- phone focus ----------
+
+  private activeGroup(): GroupId | null {
+    const host = this.inner.querySelector<HTMLElement>(`[data-key="${this.active}"]`)?.closest<HTMLElement>('[data-group]');
+    return (host?.dataset.group as GroupId | undefined) ?? null;
+  }
+
+  /** Shows one control on phones (desktop CSS ignores this) and highlights its chip. */
+  focus(key: string): void {
+    const target = this.inner.querySelector<HTMLElement>(`[data-key="${key}"]`);
+    if (!target) return;
+    this.active = key;
+    this.inner.querySelectorAll<HTMLElement>('[data-key]').forEach((n) => n.classList.toggle('is-active', n === target));
+    this.inner.querySelectorAll<HTMLElement>('.panel-section').forEach((s) => s.classList.toggle('has-active', s.contains(target)));
+    for (const [k, chip] of this.chips) chip.setAttribute('aria-pressed', String(k === key));
+    this.chips.get(key)?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+
+    const groupId = this.activeGroup();
+    const group = GROUPS.find((g) => g.id === groupId);
+    document.getElementById('sheetTitle')!.innerHTML = group
+      ? `<span class="numeral">${group.numeral}.</span> ${group.title}`
+      : 'Adjust';
+    document.getElementById('sheetTools')!.hidden = !group;
+    if (group) {
+      this.sheetDice.title = `Randomize ${group.title.toLowerCase()} only`;
+      this.sheetDice.setAttribute('aria-label', this.sheetDice.title);
+    }
+    this.syncLocks();
+  }
+
+  // ---------- glass while dragging ----------
+
+  /** While a slider is dragged, everything but that slider fades so the artwork shows. */
+  private startScrub(ctl: HTMLElement): void {
+    clearTimeout(this.scrubTimer);
+    this.endScrub();
+    ctl.classList.add('is-scrubbing');
+    for (let node: HTMLElement = ctl; node !== this.inner && node.parentElement; node = node.parentElement) {
+      for (const sibling of node.parentElement.children) if (sibling !== node) sibling.classList.add('ghosted');
+    }
+    this.app.dataset.scrub = 'true';
+    const release = () => {
+      removeEventListener('pointerup', release);
+      removeEventListener('pointercancel', release);
+      this.scrubTimer = window.setTimeout(() => this.endScrub(), 260);
+    };
+    addEventListener('pointerup', release);
+    addEventListener('pointercancel', release);
+  }
+
+  private endScrub(): void {
+    this.app.dataset.scrub = 'false';
+    this.inner.querySelectorAll('.ghosted').forEach((n) => n.classList.remove('ghosted'));
+    this.inner.querySelectorAll('.is-scrubbing').forEach((n) => n.classList.remove('is-scrubbing'));
+  }
+
+  // ---------- sync ----------
 
   private sync(): void {
     const cfg = this.store.state.config;
@@ -220,12 +363,14 @@ export class Panel {
   }
 
   private syncLocks(): void {
-    for (const [id, btn] of this.lockButtons) {
-      const locked = this.store.state.locked.has(id);
+    const paint = (btn: HTMLButtonElement, locked: boolean) => {
       btn.setAttribute('aria-pressed', String(locked));
       btn.title = locked ? 'Locked — Randomize leaves this alone' : 'Lock against Randomize';
       btn.setAttribute('aria-label', btn.title);
       btn.innerHTML = icon(locked ? 'lock' : 'unlock', 16);
-    }
+    };
+    for (const [id, btn] of this.lockButtons) paint(btn, this.store.state.locked.has(id));
+    const group = this.sheetLock ? this.activeGroup() : null;
+    if (this.sheetLock && group) paint(this.sheetLock, this.store.state.locked.has(group));
   }
 }

@@ -56,13 +56,22 @@
 
       <aside class="panel" id="panel" aria-label="Controls">
         <div class="panel-inner" id="panelInner">
-          <div class="sheet-bar"><span class="grab" aria-hidden="true"></span><strong>Adjust</strong><button class="chip" type="button" id="panelDone">Done</button></div>
-          <section class="master" id="master" aria-label="Master controls"></section>
-          <section class="presets">
+          <!-- Phone header: the active control's section, its dice + lock, peek and Done. -->
+          <div class="sheet-bar">
+            <span class="grab" aria-hidden="true"></span>
+            <strong id="sheetTitle">Adjust</strong>
+            <div class="sheet-tools" id="sheetTools"></div>
+            <button class="icon-btn small peek" type="button" id="peek" title="Hold to see the whole piece" aria-label="Hold to peek"></button>
+            <button class="chip" type="button" id="panelDone">Done</button>
+          </div>
+          <section class="master panel-section" id="master" aria-label="Master controls"></section>
+          <section class="presets panel-section" data-key="presets">
             <h2 class="eyebrow">Start from</h2>
             <div class="preset-row" id="presets"></div>
           </section>
           <div id="groups"></div>
+          <!-- Phones show one control at a time; this rail picks which. -->
+          <nav class="chips" id="chips" aria-label="Choose a control"></nav>
           <footer class="panel-foot">
             <span>Open source ·</span>
             <a href="https://github.com/ossianravn/pigment-drift-generator" target="_blank" rel="noopener">GitHub</a>
