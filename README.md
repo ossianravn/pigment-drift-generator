@@ -98,7 +98,8 @@ Each export downloads as a zip pack with the files, copy-paste HTML/CSS, an `exa
 Several fingers work at once, and pens report pressure. While you paint, the tools fade back so nothing sits between you and the paper.
 
 - **Start from a piece.** *Paint* in the generator opens the studio with the piece you were looking at, so you can put your fingers into the pattern itself.
-- **Palette & paper.** Switch palettes at any time and the whole painting recolors. Set how many washes it dries into, how far wet pigment bleeds, how much the dried painting breathes, the edges and the paper texture.
+- **Inks.** A painting holds up to three inks, each a five-color ramp; the pans show the one you're using. Paint remembers its ink, so adding or switching inks never changes earlier strokes, and inks that meet blend like wet pigment. Pick an ink's colors from any palette, mix one around any hue, or recolor an ink later to change everything painted with it. The ink button sits at the left of the dock.
+- **Paper & water.** Set how many washes paint dries into, how far wet pigment bleeds, how much the dried painting breathes, the edges and the paper texture.
 - **Nothing to lose.** Undo covers every gesture, and the painting stays in your browser between visits. **Save** downloads a PNG, or opens the share sheet on a phone.
 
 ## Use it on your site
@@ -186,7 +187,8 @@ In the paint studio:
 | <kbd>1</kbd>–<kbd>5</kbd> | Pigments, deepest to palest |
 | <kbd>W</kbd> / <kbd>B</kbd> | Water / blot |
 | <kbd>[</kbd> <kbd>]</kbd> | Brush size (or the mouse wheel) |
-| <kbd>P</kbd> | Palette & paper |
+| <kbd>I</kbd> | Inks: switch, add or recolor |
+| <kbd>P</kbd> | Paper & water |
 | <kbd>H</kbd> | Hide everything but the painting |
 | <kbd>Ctrl/⌘ S</kbd> | Save as PNG |
 | <kbd>Ctrl/⌘ Z</kbd> | Undo (add <kbd>Shift</kbd> to redo) |
@@ -197,7 +199,7 @@ In the paint studio:
 | `?view=mobile` | The phone preview |
 | `?screensaver` | The artwork-only view, for kiosks and second screens |
 | `?open=export:video` | The exporter on a tab: `image`, `video`, `embed` or `config` |
-| `/paint/` | The paint studio (`?open=paper` opens its palette sheet, `?blank` starts on bare paper) |
+| `/paint/` | The paint studio (`?open=inks` or `?open=paper` opens a panel, `?blank` starts on bare paper) |
 
 ## How it works
 
@@ -211,7 +213,7 @@ Every pixel comes from one fragment shader ([`src/engine/shader.ts`](src/engine/
 
 **Seamless loops**: every time-varying input is driven by a point travelling once around a circle per loop, and the current's streaks cross-fade between two phases. Frame *N* is exactly frame 0.
 
-**The paint studio** ([`src/paint/`](src/paint/)) keeps a *pigment field* on the GPU: how much pigment lies on each spot of paper, and how wet it is.
+**The paint studio** ([`src/paint/`](src/paint/)) keeps a *pigment field* on the GPU: how much pigment lies on each spot of paper, how wet it is, and how much of it belongs to each ink. The inks are stored as amounts rather than shares, so every operation below carries them along for free.
 
 - A small stable-fluids simulation moves the field: advection, vorticity confinement and a pressure solve. Resampling is sharpened Catmull-Rom, so folds stay crisp.
 - Drops use the area-preserving map from mathematical marbling, which squeezes everything around them into rings.

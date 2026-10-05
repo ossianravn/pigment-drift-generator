@@ -1,10 +1,10 @@
-// The studio's preferences: palette, the feel of water and paper, and the brush.
+// The studio's preferences: the inks, the feel of water and paper, and the brush.
 // Pure functions, so they're easy to test; main.ts persists them in localStorage.
 
 import { isHex } from '../engine/color';
 import { PALETTES, type Palette } from '../engine/palettes';
 import type { Tool } from './brush';
-import type { Look } from './engine';
+import { type Look, MAX_INKS } from './engine';
 
 /** Pigment each pan lays down, deepest -> palest: where the wash stack shows that pan's own color. */
 export const PAN_INK = [0.95, 0.8, 0.54, 0.35, 0.12];
@@ -13,7 +13,10 @@ export const PAN_NAMES = ['Deepest', 'Deep', 'Middle', 'Light', 'Palest'];
 export const SIZES = [7, 14, 24, 42];
 
 export interface Settings {
-  palette: Palette;
+  /** One to three inks, each a five-color ramp. The first ink also sets the paper. */
+  inks: Palette[];
+  /** The ink the pans show and paint with. */
+  ink: number;
   layers: number;
   bleed: number;
   drift: number;
@@ -33,7 +36,8 @@ export interface Settings {
 
 export function defaultSettings(reducedMotion = false): Settings {
   return {
-    palette: { ...PALETTES[0], colors: [...PALETTES[0].colors] },
+    inks: [copyPalette(PALETTES[0])],
+    ink: 0,
     layers: 5,
     bleed: 0.5,
     drift: reducedMotion ? 0 : 0.35,
@@ -53,15 +57,21 @@ export function defaultSettings(reducedMotion = false): Settings {
 
 /** Coerces anything (old or hand-edited storage) into valid settings; unknown or bad values fall back to `base`. */
 export function sanitizeSettings(input: unknown, base: Settings): Settings {
-  const s: Settings = { ...base, palette: { ...base.palette, colors: [...base.palette.colors] } };
+  const s: Settings = { ...base, inks: base.inks.map(copyPalette) };
   if (!input || typeof input !== 'object') return s;
-  const raw = input as Partial<Record<keyof Settings, unknown>>;
+  const raw = input as Partial<Record<keyof Settings | 'palette', unknown>>;
   const num = (v: unknown, lo: number, hi: number, d: number) =>
     typeof v === 'number' && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : d;
-  const p = raw.palette as Partial<Palette> | undefined;
-  if (p && isHex(p.paper) && Array.isArray(p.colors) && p.colors.length === 5 && p.colors.every(isHex)) {
-    s.palette = { name: String(p.name ?? 'Custom'), paper: p.paper, colors: [...p.colors] };
-  }
+  const valid = (p: unknown): p is Palette => {
+    const q = p as Partial<Palette> | null;
+    return !!q && isHex(q.paper) && Array.isArray(q.colors) && q.colors.length === 5 && q.colors.every(isHex);
+  };
+  const named = (p: Palette): Palette => ({ name: String(p.name ?? 'Custom'), paper: p.paper, colors: [...p.colors] });
+  const inks = Array.isArray(raw.inks) ? raw.inks.filter(valid).slice(0, MAX_INKS).map(named) : [];
+  // Settings from before inks had a single palette.
+  if (!inks.length && valid(raw.palette)) inks.push(named(raw.palette));
+  if (inks.length) s.inks = inks;
+  s.ink = Math.round(num(raw.ink, 0, s.inks.length - 1, 0));
   s.layers = Math.round(num(raw.layers, 2, 7, s.layers));
   for (const k of ['bleed', 'drift', 'texture', 'edges', 'hueDrift', 'mist', 'ridge', 'feather'] as const) s[k] = num(raw[k], 0, 1, s[k]);
   s.density = num(raw.density, 0.3, 1.3, s.density);
@@ -73,6 +83,10 @@ export function sanitizeSettings(input: unknown, base: Settings): Settings {
 }
 
 export function lookOf(s: Settings): Look {
-  const { palette, layers, bleed, drift, texture, edges, hueDrift, mist, ridge, feather, density } = s;
-  return { paper: palette.paper, colors: [...palette.colors], layers, bleed, drift, texture, edges, hueDrift, mist, ridge, feather, density };
+  const { inks, layers, bleed, drift, texture, edges, hueDrift, mist, ridge, feather, density } = s;
+  return { paper: inks[0].paper, inks: inks.map((i) => [...i.colors]), layers, bleed, drift, texture, edges, hueDrift, mist, ridge, feather, density };
+}
+
+export function copyPalette(p: Palette): Palette {
+  return { ...p, colors: [...p.colors] };
 }

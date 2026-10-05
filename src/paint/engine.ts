@@ -7,10 +7,13 @@ import { createRng } from '../engine/params';
 import { breathe } from './noise';
 import * as SH from './shaders';
 
+/** A painting can hold this many inks at once. */
+export const MAX_INKS = 3;
+
 export interface Look {
   paper: string;
-  /** Deepest -> palest, like the generator's palettes. */
-  colors: string[];
+  /** One to three inks, each five colors from deepest to palest, like the generator's palettes. */
+  inks: string[][];
   layers: number;
   bleed: number;
   drift: number;
@@ -33,6 +36,8 @@ export interface Segment {
   target: number;
   strength: number;
   kind: Kind;
+  /** Which ink (0..2) a paint stroke lays down. */
+  slot: number;
   /** Velocity the water is pulled toward (texels/s) and how hard. */
   fx: number; fy: number; coupling: number;
 }
@@ -42,6 +47,8 @@ export interface Drop {
   x: number; y: number; r0: number; r1: number;
   ink: number;
   kind: Kind;
+  /** Which ink (0..2) an ink drop is. */
+  slot: number;
 }
 
 export interface SheetMeta {
@@ -56,8 +63,13 @@ export interface SheetMeta {
 export interface SavedSheet extends SheetMeta {
   fieldW: number;
   fieldH: number;
-  /** Pigment as 16-bit big-endian pairs, row by row from the bottom. */
+  /**
+   * Row by row from the bottom. Format 2: four bytes per texel (pigment as 16-bit
+   * big-endian, then the second and third inks' shares). Older saves (no format):
+   * two bytes per texel, pigment only.
+   */
   data: Uint8Array;
+  format?: 2;
 }
 
 interface Target { tex: WebGLTexture; fbo: WebGLFramebuffer; w: number; h: number }
@@ -138,7 +150,7 @@ export class PaintEngine {
     this.r = r;
     this.rgba = rgba;
     this.maxTexels = opts.coarse ? 0.55e6 : 2.1e6;
-    this.historyBytes = opts.coarse ? 24e6 : 64e6;
+    this.historyBytes = opts.coarse ? 28e6 : 100e6;
 
     this.vao = gl.createVertexArray()!;
     gl.bindVertexArray(this.vao);
@@ -227,7 +239,7 @@ export class PaintEngine {
   compose(cfg: DriftConfig): void {
     if (!this.ready) return;
     this.checkpoint();
-    const t = this.settleTarget ?? this.makeTarget(this.fieldW, this.fieldH, this.rg, true);
+    const t = this.settleTarget ?? this.makeTarget(this.fieldW, this.fieldH, this.rgba, true);
     this.settleTarget = t;
     const rand = createRng(cfg.seed * 7919 + 13);
     const seedOff = [rand() * 240 - 120, rand() * 240 - 120];
@@ -257,9 +269,9 @@ export class PaintEngine {
   clear(): void {
     if (!this.ready) return;
     this.checkpoint();
-    const t = this.settleTarget ?? this.makeTarget(this.fieldW, this.fieldH, this.rg, true);
+    const t = this.settleTarget ?? this.makeTarget(this.fieldW, this.fieldH, this.rgba, true);
     this.settleTarget = t;
-    this.fillTarget(t, [0, 0, 0, 1]);
+    this.fillTarget(t, [0, 0, 0, 0]);
     this.settleLeft = SETTLE_SECONDS * 0.8;
   }
 
@@ -283,10 +295,11 @@ export class PaintEngine {
     return this.travel(this.redoStack, this.undoStack);
   }
 
-  /** Snapshots keep only the pigment (half the memory of the sheet); a restored sheet is dry. */
+  /** Snapshots keep pigment and inks in four bytes per texel; a restored sheet is dry. */
   private snapshot(): Target {
-    const snap = this.pool.pop() ?? this.makeTarget(this.fieldW, this.fieldH, this.r, false);
-    this.copyTarget(this.field[0], snap);
+    const gl = this.gl;
+    const snap = this.pool.pop() ?? this.makeTarget(this.fieldW, this.fieldH, { internal: gl.RGBA8, format: gl.RGBA }, false, gl.UNSIGNED_BYTE);
+    this.run('encode', snap, () => {}, { uSrc: this.field[0].tex });
     return snap;
   }
 
@@ -295,7 +308,7 @@ export class PaintEngine {
     if (!snap) return false;
     this.finishSettle();
     to.push(this.snapshot());
-    this.copyTarget(snap, this.field[0]);
+    this.run('decode', this.field[0], (u) => this.gl.uniform1f(u.uInks, 1), { uSrc: snap.tex });
     this.pool.push(snap);
     this.trimPool();
     this.stopFlow();
@@ -307,17 +320,19 @@ export class PaintEngine {
 
   setLook(look: Look, animate = false): void {
     const prev = this.look;
-    this.look = { ...look, colors: [...look.colors] };
+    this.look = { ...look, inks: look.inks.map((i) => [...i]) };
     const paper = hexToLinear(look.paper);
-    const lab = look.colors.flatMap((c) => hexToOklab(c));
+    const inks = Array.from({ length: MAX_INKS }, (_, i) => look.inks[i] ?? look.inks[0]);
+    const lab = inks.flatMap((ink) => ink.flatMap((c) => hexToOklab(c)));
+    const key = (l: Look) => `${l.paper}|${l.inks.join('|')}`;
     const now = performance.now();
-    if (animate && prev && (prev.paper !== look.paper || prev.colors.join() !== look.colors.join())) {
+    if (animate && prev && key(prev) !== key(look)) {
       const t = this.tweenT(now);
       this.paperFrom = mixArr(this.paperFrom, this.paperTo, t);
       this.labFrom = mixArr(this.labFrom, this.labTo, t);
       this.tweenStart = now;
       this.tweenMs = 700;
-    } else if (!prev || prev.paper !== look.paper || prev.colors.join() !== look.colors.join()) {
+    } else if (!prev || key(prev) !== key(look)) {
       this.paperFrom = paper;
       this.labFrom = lab;
       this.tweenMs = 0;
@@ -350,14 +365,14 @@ export class PaintEngine {
     for (let i = 0; i < n; i++) {
       const s = segs[i];
       this.segBuf.set([s.ax, s.ay, s.bx, s.by], i * 4);
-      this.segPBuf.set([s.radius, s.target, s.strength, s.kind], i * 4);
+      this.segPBuf.set([s.radius, s.target, s.strength, s.kind + 4 * s.slot], i * 4);
       this.forceBuf.set([s.fx, s.fy, s.radius * 1.3, s.coupling], i * 4);
     }
     const nd = Math.min(drops.length, MAX_DROPS);
     for (let i = 0; i < nd; i++) {
       const d = drops[i];
       this.dropBuf.set([d.x, d.y, d.r0 * d.r0, d.r1 * d.r1], i * 4);
-      this.dropInkBuf.set([d.ink, 1.5, d.kind, 0], i * 4);
+      this.dropInkBuf.set([d.ink, 1.5, d.kind, d.slot], i * 4);
     }
 
     if (flowing) {
@@ -553,26 +568,25 @@ export class PaintEngine {
     gl.readPixels(0, 0, this.fieldW, this.fieldH, gl.RGBA, gl.UNSIGNED_BYTE, raw);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     this.deleteTarget(t);
-    const data = new Uint8Array(this.fieldW * this.fieldH * 2);
-    for (let i = 0, j = 0; i < raw.length; i += 4, j += 2) {
-      data[j] = raw[i];
-      data[j + 1] = raw[i + 1];
-    }
-    return { ...this.meta, fieldW: this.fieldW, fieldH: this.fieldH, data };
+    return { ...this.meta, fieldW: this.fieldW, fieldH: this.fieldH, data: raw, format: 2 };
   }
 
   /** Restores a saved sheet. Returns false if it doesn't fit this device. */
   load(saved: SavedSheet): boolean {
     const gl = this.gl;
-    if (saved.data.length !== saved.fieldW * saved.fieldH * 2) return false;
+    const texels = saved.fieldW * saved.fieldH;
+    const inks = saved.format === 2;
+    if (saved.data.length !== texels * (inks ? 4 : 2)) return false;
     this.meta = { width: saved.width, height: saved.height, unit: saved.unit, seed: [...saved.seed] as [number, number] };
     this.release();
     this.allocate();
-    const rgba = new Uint8Array(saved.fieldW * saved.fieldH * 4);
-    for (let i = 0, j = 0; j < saved.data.length; i += 4, j += 2) {
-      rgba[i] = saved.data[j];
-      rgba[i + 1] = saved.data[j + 1];
-      rgba[i + 3] = 255;
+    let rgba = saved.data;
+    if (!inks) {
+      rgba = new Uint8Array(texels * 4);
+      for (let i = 0, j = 0; j < saved.data.length; i += 4, j += 2) {
+        rgba[i] = saved.data[j];
+        rgba[i + 1] = saved.data[j + 1];
+      }
     }
     const tex = gl.createTexture()!;
     gl.bindTexture(gl.TEXTURE_2D, tex);
@@ -580,8 +594,8 @@ export class PaintEngine {
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, saved.fieldW, saved.fieldH, 0, gl.RGBA, gl.UNSIGNED_BYTE, rgba);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-    const decoded = this.makeTarget(saved.fieldW, saved.fieldH, this.rg, true);
-    this.run('decode', decoded, () => {}, { uSrc: tex });
+    const decoded = this.makeTarget(saved.fieldW, saved.fieldH, this.rgba, true);
+    this.run('decode', decoded, (u) => gl.uniform1f(u.uInks, inks ? 1 : 0), { uSrc: tex });
     gl.deleteTexture(tex);
     // Resample if this device picked a different texel density for the same sheet.
     this.run('copy', this.field[0], (u) => {
@@ -611,16 +625,16 @@ export class PaintEngine {
     this.k = Math.min(1, Math.sqrt(this.maxTexels / (width * height)), maxTex / width, maxTex / height);
     this.fieldW = Math.max(1, Math.round(width * this.k));
     this.fieldH = Math.max(1, Math.round(height * this.k));
-    const bytesPerTexel = this.r.internal === gl.R16F ? 2 : this.r.internal === gl.RG16F ? 4 : 8;
-    this.maxSnapshots = Math.max(4, Math.min(16, Math.floor(this.historyBytes / (this.fieldW * this.fieldH * bytesPerTexel))));
-    this.field = [this.makeTarget(this.fieldW, this.fieldH, this.rg, true), this.makeTarget(this.fieldW, this.fieldH, this.rg, true)];
+    // Snapshots are four bytes per texel (see ENCODE).
+    this.maxSnapshots = Math.max(4, Math.min(16, Math.floor(this.historyBytes / (this.fieldW * this.fieldH * 4))));
+    this.field = [this.makeTarget(this.fieldW, this.fieldH, this.rgba, true), this.makeTarget(this.fieldW, this.fieldH, this.rgba, true)];
     const vw = Math.max(1, Math.ceil(this.fieldW / VEL_DOWNSCALE));
     const vh = Math.max(1, Math.ceil(this.fieldH / VEL_DOWNSCALE));
     this.vel = [this.makeTarget(vw, vh, this.rg, true), this.makeTarget(vw, vh, this.rg, true)];
     this.pressure = [this.makeTarget(vw, vh, this.r, false), this.makeTarget(vw, vh, this.r, false)];
     this.divergence = this.makeTarget(vw, vh, this.r, false);
     this.curl = this.makeTarget(vw, vh, this.r, false);
-    for (const t of [...this.field, ...this.vel, ...this.pressure, this.divergence, this.curl]) this.fillTarget(t, [0, 0, 0, 1]);
+    for (const t of [...this.field, ...this.vel, ...this.pressure, this.divergence, this.curl]) this.fillTarget(t, [0, 0, 0, 0]);
   }
 
   /** Frees every GPU target, except `keep` (used to carry the old sheet over when growing). */
@@ -656,7 +670,7 @@ export class PaintEngine {
   }
 
   private stopFlow(): void {
-    for (const t of [...this.vel, ...this.pressure]) this.fillTarget(t, [0, 0, 0, 1]);
+    for (const t of [...this.vel, ...this.pressure]) this.fillTarget(t, [0, 0, 0, 0]);
     this.flowUntil = 0;
     this.velDirty = false;
   }

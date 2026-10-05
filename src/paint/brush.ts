@@ -12,6 +12,8 @@ export interface BrushState {
   tool: Tool;
   /** Pigment amount the selected pan lays down (0 = bare paper). */
   ink: number;
+  /** Which of the painting's inks (0..2) it is. */
+  slot: number;
   /** Radius in CSS px. */
   radius: number;
 }
@@ -22,7 +24,7 @@ interface Growing {
   r: number; target: number; base: number;
   /** Radius the sheet has already been pushed to. */
   shown: number;
-  ink: number; kind: Kind;
+  ink: number; kind: Kind; slot: number;
   held: boolean;
 }
 
@@ -30,6 +32,7 @@ interface Active {
   id: number;
   tool: Tool;
   ink: number;
+  slot: number;
   radius: number;
   mode: 'pending' | 'drop' | 'stroke';
   downAt: number;
@@ -75,6 +78,7 @@ export class BrushInput {
       id: e.pointerId,
       tool: b.tool,
       ink: b.ink,
+      slot: b.slot,
       radius: b.radius,
       mode: 'pending',
       downAt: this.clock(),
@@ -178,6 +182,7 @@ export class BrushInput {
           target: a.ink,
           strength: (moving ? style.strength : style.dwell) * (0.55 + 0.9 * p.p),
           kind: style.kind,
+          slot: a.slot,
           fx: a.vx * k, fy: -a.vy * k,
           coupling: moving ? style.coupling : 0,
         });
@@ -199,7 +204,7 @@ export class BrushInput {
       // Every push resamples the sheet, so push in steps of at least ~half a texel.
       const settling = !d.held && d.target - d.r < 0.2;
       if (d.r - d.shown > 0.5 || (settling && d.r > d.shown)) {
-        out.push({ x: d.x, y: d.y, r0: d.shown, r1: d.r, ink: d.ink, kind: d.kind });
+        out.push({ x: d.x, y: d.y, r0: d.shown, r1: d.r, ink: d.ink, kind: d.kind, slot: d.slot });
         d.shown = d.r;
       }
     }
@@ -217,6 +222,7 @@ export class BrushInput {
     const drop: Growing = {
       x, y, r: 0, target: base, base, shown: 0,
       ink: a.ink,
+      slot: a.slot,
       kind: a.tool === 'water' ? Kind.Water : Kind.Paint,
       held: this.active.has(a.id),
     };

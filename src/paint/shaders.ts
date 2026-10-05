@@ -1,10 +1,14 @@
 // GLSL for the paint studio.
 //
-// The sheet is a pigment field: R = how much pigment lies on the paper (0 = bare),
-// G = how wet the paper is. A small fluid sim moves it around, wet areas bleed,
-// and the render pass cuts the field into stacked washes exactly the way the
-// generator cuts its procedural height field, so every stroke dries into the
-// same pigment drift look.
+// The sheet is a pigment field:
+//   R  how much pigment lies on the paper (0 = bare)
+//   G  how wet the paper is
+//   BA how much of that pigment is the second and third ink (the rest is the first)
+// The inks are stored premultiplied (amount of each ink, not its share), so
+// pushing, stirring, bleeding and blotting move them exactly like the pigment.
+// A small fluid sim moves the field, wet areas bleed, and the render pass cuts
+// it into stacked washes the way the generator cuts its procedural height field,
+// so every stroke dries into the same pigment drift look.
 
 export const VERTEX = /* glsl */ `#version 300 es
 in vec2 aPos;
@@ -76,7 +80,7 @@ out vec4 o;
 void main() {
   vec2 size = vec2(textureSize(uSrc, 0));
   vec2 p = clamp(gl_FragCoord.xy * uMap.xy + uMap.zw, vec2(0.5), size - 0.5);
-  o = vec4(texture(uSrc, p / size).xy, 0.0, 1.0);
+  o = texture(uSrc, p / size);
 }
 `;
 
@@ -87,22 +91,31 @@ out vec4 o;
 void main() { o = uValue; }
 `;
 
-/** Pigment -> 16 bits in two bytes, for saving the sheet. */
+/**
+ * The sheet in four bytes per texel, for undo snapshots and saving:
+ * pigment as 16 bits, then the second and third inks' shares as 8 bits each.
+ * (Wetness isn't kept: a restored sheet is dry.)
+ */
 export const ENCODE = HEAD + /* glsl */ `
 uniform sampler2D uSrc;
 out vec4 o;
 void main() {
-  float v = floor(clamp(texelFetch(uSrc, ivec2(gl_FragCoord.xy), 0).x * 0.5, 0.0, 1.0) * 65535.0 + 0.5);
-  o = vec4(floor(v / 256.0), mod(v, 256.0), 0.0, 255.0) / 255.0;
+  vec4 f = texelFetch(uSrc, ivec2(gl_FragCoord.xy), 0);
+  float v = floor(clamp(f.x * 0.5, 0.0, 1.0) * 65535.0 + 0.5);
+  vec2 share = f.x > 1e-4 ? clamp(f.zw / f.x, 0.0, 1.0) : vec2(0.0);
+  o = vec4(floor(v / 256.0) / 255.0, mod(v, 256.0) / 255.0, share);
 }
 `;
 
+/** uInks = 0 reads the older two-byte format (pigment only, all first ink). */
 export const DECODE = HEAD + /* glsl */ `
 uniform sampler2D uSrc;
+uniform float uInks;
 out vec4 o;
 void main() {
-  vec4 b = texelFetch(uSrc, ivec2(gl_FragCoord.xy), 0) * 255.0;
-  o = vec4((b.x * 256.0 + b.y) / 65535.0 * 2.0, 0.0, 0.0, 1.0);
+  vec4 b = texelFetch(uSrc, ivec2(gl_FragCoord.xy), 0);
+  float p = (floor(b.x * 255.0 + 0.5) * 256.0 + floor(b.y * 255.0 + 0.5)) / 65535.0 * 2.0;
+  o = vec4(p, 0.0, b.zw * p * uInks);
 }
 `;
 
@@ -114,9 +127,9 @@ uniform float uAmount;
 out vec4 o;
 void main() {
   ivec2 p = ivec2(gl_FragCoord.xy);
-  vec2 a = texelFetch(uSrc, p, 0).xy;
-  float b = texelFetch(uTarget, p, 0).x;
-  o = vec4(mix(a.x, b, uAmount), a.y * (1.0 - uAmount), 0.0, 1.0);
+  vec4 a = texelFetch(uSrc, p, 0);
+  vec4 b = texelFetch(uTarget, p, 0);
+  o = vec4(mix(a.x, b.x, uAmount), a.y * (1.0 - uAmount), mix(a.zw, b.zw, uAmount));
 }
 `;
 
@@ -274,17 +287,22 @@ uniform vec2 uSeedOff;
 const int MAX_DROPS = 4;
 uniform int uDropCount;
 uniform vec4 uDrop[MAX_DROPS];     // center.xy, r0^2, r1^2 (texels)
-uniform vec4 uDropInk[MAX_DROPS];  // pigment, edge softness (texels), kind (0 ink, 1 water, 2 blot)
+uniform vec4 uDropInk[MAX_DROPS];  // pigment, edge softness (texels), kind (0 ink, 1 water), ink slot
 
-uniform vec4 uSegP[MAX_SEGS];      // radius, target pigment, strength, kind (0 paint, 1 water, 2 lift)
+uniform vec4 uSegP[MAX_SEGS];      // radius, target pigment, strength, kind + 4 * ink slot (kinds: 0 paint, 1 water, 2 lift)
 
 out vec4 o;
 
-vec2 fieldAt(vec2 p) { return texture(uField, p / uSize).xy; }
+vec4 fieldAt(vec2 p) { return texture(uField, p / uSize); }
+
+/** What a pigment amount p of ink "slot" stores in the BA channels. */
+vec2 inkOf(float slot, float p) {
+  return vec2(slot > 0.5 && slot < 1.5 ? p : 0.0, slot > 1.5 ? p : 0.0);
+}
 
 // Catmull-Rom (9 bilinear taps), clamped to the four nearest texels. Plain bilinear
 // resampling every frame would slowly blur the rings and folds away.
-vec2 fieldSharp(vec2 p) {
+vec4 fieldSharp(vec2 p) {
   vec2 pos = p - 0.5;
   vec2 i = floor(pos);
   vec2 f = pos - i;
@@ -296,16 +314,16 @@ vec2 fieldSharp(vec2 p) {
   vec2 t0 = (i - 0.5) / uSize;
   vec2 t3 = (i + 2.5) / uSize;
   vec2 t12 = (i + 0.5 + w2 / w12) / uSize;
-  vec2 r =
-      (texture(uField, vec2(t0.x, t0.y)).xy * w0.x + texture(uField, vec2(t12.x, t0.y)).xy * w12.x + texture(uField, vec2(t3.x, t0.y)).xy * w3.x) * w0.y
-    + (texture(uField, vec2(t0.x, t12.y)).xy * w0.x + texture(uField, vec2(t12.x, t12.y)).xy * w12.x + texture(uField, vec2(t3.x, t12.y)).xy * w3.x) * w12.y
-    + (texture(uField, vec2(t0.x, t3.y)).xy * w0.x + texture(uField, vec2(t12.x, t3.y)).xy * w12.x + texture(uField, vec2(t3.x, t3.y)).xy * w3.x) * w3.y;
+  vec4 r =
+      (texture(uField, vec2(t0.x, t0.y)) * w0.x + texture(uField, vec2(t12.x, t0.y)) * w12.x + texture(uField, vec2(t3.x, t0.y)) * w3.x) * w0.y
+    + (texture(uField, vec2(t0.x, t12.y)) * w0.x + texture(uField, vec2(t12.x, t12.y)) * w12.x + texture(uField, vec2(t3.x, t12.y)) * w3.x) * w12.y
+    + (texture(uField, vec2(t0.x, t3.y)) * w0.x + texture(uField, vec2(t12.x, t3.y)) * w12.x + texture(uField, vec2(t3.x, t3.y)) * w3.x) * w3.y;
   ivec2 m = ivec2(uSize) - 1;
   ivec2 b = ivec2(i);
-  vec2 a = texelFetch(uField, clamp(b, ivec2(0), m), 0).xy;
-  vec2 c = texelFetch(uField, clamp(b + ivec2(1, 0), ivec2(0), m), 0).xy;
-  vec2 d = texelFetch(uField, clamp(b + ivec2(0, 1), ivec2(0), m), 0).xy;
-  vec2 e = texelFetch(uField, clamp(b + ivec2(1, 1), ivec2(0), m), 0).xy;
+  vec4 a = texelFetch(uField, clamp(b, ivec2(0), m), 0);
+  vec4 c = texelFetch(uField, clamp(b + ivec2(1, 0), ivec2(0), m), 0);
+  vec4 d = texelFetch(uField, clamp(b + ivec2(0, 1), ivec2(0), m), 0);
+  vec4 e = texelFetch(uField, clamp(b + ivec2(1, 1), ivec2(0), m), 0);
   return clamp(r, min(min(a, c), min(d, e)), max(max(a, c), max(d, e)));
 }
 
@@ -315,7 +333,7 @@ void main() {
 
   // Drops: every point outside a growing drop is pushed outward so the area is
   // conserved, which squeezes the existing washes into rings around it.
-  float inkCov = 0.0, inkVal = 0.0, inkKind = 0.0;
+  float inkCov = 0.0, inkVal = 0.0, inkKind = 0.0, inkSlot = 0.0;
   for (int i = 0; i < MAX_DROPS; i++) {
     if (i >= uDropCount) break;
     vec4 d = uDrop[i];
@@ -324,33 +342,39 @@ void main() {
     if (ds < d.w) {
       float r1 = sqrt(d.w);
       float cov = 1.0 - smoothstep(r1 - uDropInk[i].y, r1, sqrt(ds));
-      if (cov > inkCov) { inkCov = cov; inkVal = uDropInk[i].x; inkKind = uDropInk[i].z; }
+      if (cov > inkCov) { inkCov = cov; inkVal = uDropInk[i].x; inkKind = uDropInk[i].z; inkSlot = uDropInk[i].w; }
     }
     src = d.xy + rel * sqrt(max(1.0 - (d.w - d.z) / max(ds, d.w), 0.0));
   }
 
   if (uFlowing > 0.5) src -= texture(uVel, src / uSize).xy * uDt;
   // Untouched texels are copied exactly (and cheaply); only moved ones are resampled.
-  vec2 f = length(src - q) < 0.002 ? texelFetch(uField, ivec2(q), 0).xy : fieldSharp(src);
+  vec4 f = length(src - q) < 0.002 ? texelFetch(uField, ivec2(q), 0) : fieldSharp(src);
 
   // Wet paper: pigment creeps outward into the wet, unevenly along the paper fibers.
   // The creep only ever adds, so a stroke's core keeps its color while its edge
-  // softens into nested washes; a little true diffusion smooths the result.
+  // softens into nested washes; a little true diffusion smooths the result. Creeping
+  // pigment takes on the mix of inks it came from.
   if (f.y > 0.002) {
     float r = 1.0 + 1.6 * uBleed;
-    vec2 n = fieldAt(src + vec2(r, 0.0)) + fieldAt(src - vec2(r, 0.0))
-           + fieldAt(src + vec2(0.0, r)) + fieldAt(src - vec2(0.0, r));
-    vec2 lap = n * 0.25 - f;
+    vec4 n = (fieldAt(src + vec2(r, 0.0)) + fieldAt(src - vec2(r, 0.0))
+            + fieldAt(src + vec2(0.0, r)) + fieldAt(src - vec2(0.0, r))) * 0.25;
+    vec4 lap = n - f;
     float fiber = 0.35 + 1.0 * smoothstep(-0.5, 0.6, gnoise(q * 0.07 + uSeedOff) + 0.45 * gnoise(q * 0.23 + 5.0));
-    float wet = clamp(f.y * 1.4, 0.0, 1.0);
-    f.x += wet * fiber * (0.05 * lap.x + uBleed * 0.3 * max(lap.x, 0.0));
+    float wet = clamp(f.y * 1.4, 0.0, 1.0) * fiber;
+    float creep = wet * uBleed * 0.3 * max(lap.x, 0.0);
+    f.x += wet * 0.05 * lap.x + creep;
+    f.zw += wet * 0.05 * lap.zw + creep * n.zw / max(n.x, 1e-4);
     f.y += lap.y * 0.22;
   }
 
   if (inkCov > 0.0) {
-    if (inkKind < 0.5) f.x = mix(f.x, inkVal, inkCov);
-    else if (inkKind < 1.5) f.x *= 1.0 - 0.96 * inkCov;
-    else f.x *= 1.0 - 0.7 * inkCov;
+    if (inkKind < 0.5) {
+      f.x = mix(f.x, inkVal, inkCov);
+      f.zw = mix(f.zw, inkOf(inkSlot, inkVal), inkCov);
+    } else {
+      f.xzw *= 1.0 - 0.96 * inkCov;
+    }
     // Drops float rather than soak in, so their rings stay crisp.
     f.y = max(f.y, (inkKind < 0.5 ? 0.3 : 0.45) * inkCov);
   }
@@ -361,6 +385,8 @@ void main() {
     float t;
     float d = segDist(q, uSeg[i], t);
     if (d > sp.x * 1.6) continue;
+    float kind = mod(sp.w, 4.0);
+    float slot = floor(sp.w / 4.0);
     // Ragged edge and dry-brush streaks running along the stroke.
     float rag = gnoise(q * 0.05 + uSeedOff) * 0.16 + gnoise(q * 0.16 + 7.0) * 0.05;
     float dn = d / sp.x + rag;
@@ -368,19 +394,25 @@ void main() {
     vec2 ab = uSeg[i].zw - uSeg[i].xy;
     float side = dot(q - uSeg[i].xy, vec2(-ab.y, ab.x)) / max(length(ab), 1e-3) / sp.x;
     float bristle = length(ab) > 0.5 ? 0.7 + 0.6 * smoothstep(-0.4, 0.4, gnoise(vec2(side * 3.2, 0.5) + uSeedOff)) : 1.0;
-    if (sp.w < 0.5) {
-      f.x = mix(f.x, sp.y, clamp(cov * sp.z * bristle, 0.0, 1.0));
+    if (kind < 0.5) {
+      float k = clamp(cov * sp.z * bristle, 0.0, 1.0);
+      f.x = mix(f.x, sp.y, k);
+      f.zw = mix(f.zw, inkOf(slot, sp.y), k);
       f.y = max(f.y, (1.0 - smoothstep(0.75, 1.4, dn)) * 0.95);
-    } else if (sp.w < 1.5) {
+    } else if (kind < 1.5) {
       f.y = max(f.y, (1.0 - smoothstep(0.6, 1.25, dn)) * 0.45);
     } else {
-      f.x *= 1.0 - cov * sp.z;
+      f.xzw *= 1.0 - cov * sp.z;
       f.y *= 1.0 - cov * 0.5;
     }
   }
 
   f.y = max(f.y * uDryKeep - uDt * 0.02, 0.0);
-  o = vec4(clamp(f.x, 0.0, 1.4), f.y, 0.0, 1.0);
+  f.x = clamp(f.x, 0.0, 1.4);
+  // The inks can never add up to more than the pigment that's there.
+  f.zw = max(f.zw, 0.0);
+  f.zw *= min(1.0, f.x / max(f.z + f.w, 1e-5));
+  o = f;
 }
 `;
 
@@ -456,7 +488,7 @@ void main() {
     float lift = (1.0 - smoothstep(width * 0.5, width, ad)) * fade * uRiver;
     pig = mix(pig, min(pig, 0.11), clamp(lift, 0.0, 1.0));
   }
-  o = vec4(clamp(pig, 0.0, 1.3), 0.0, 0.0, 1.0);
+  o = vec4(clamp(pig, 0.0, 1.3), 0.0, 0.0, 0.0);
 }
 `;
 
@@ -555,7 +587,7 @@ uniform sampler2D uFlow2;
 uniform vec2 uFieldSize;
 uniform vec2 uRes;
 uniform vec3 uPaper;        // linear rgb
-uniform vec3 uLab[5];       // OKLab, deepest -> palest
+uniform vec3 uLab[15];      // three inks, each five OKLab colors, deepest -> palest
 uniform int uLayers;
 uniform float uEdge, uTexture, uHueDrift, uMist, uRidge, uFeather, uDensity;
 out vec4 fragColor;
@@ -571,12 +603,19 @@ vec3 oklabToLinear(vec3 c) {
     -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s);
 }
 
+// This pixel's share of each ink (set once per pixel in main).
+vec3 inkShare = vec3(1.0, 0.0, 0.0);
+
+// x in 0..4 along the ramps (0 = deepest), the inks mixed in OKLab by their shares.
 vec3 pigment(float x) {
   x = clamp(x, 0.0, 4.0);
   int a = int(min(floor(x), 3.0));
   float f = x - float(a);
   f = f * f * (3.0 - 2.0 * f);
-  return max(oklabToLinear(mix(uLab[a], uLab[a + 1], f)), vec3(0.0));
+  vec3 lab = inkShare.x * mix(uLab[a], uLab[a + 1], f)
+           + inkShare.y * mix(uLab[a + 5], uLab[a + 6], f)
+           + inkShare.z * mix(uLab[a + 10], uLab[a + 11], f);
+  return max(oklabToLinear(lab), vec3(0.0));
 }
 
 vec3 toSrgb(vec3 c) {
@@ -600,9 +639,11 @@ void main() {
   vec2 ft = frag * uMap.xy + uMap.zw;
   vec2 at = ft + f0.xy;
 
-  vec2 fv = texture(uField, at / uFieldSize).xy;
+  vec4 fv = texture(uField, at / uFieldSize);
   float pv = fv.x;
   float wet = fv.y;
+  vec2 other = pv > 1e-4 ? clamp(fv.zw / pv, 0.0, 1.0) : vec2(0.0);
+  inkShare = vec3(max(1.0 - other.x - other.y, 0.0), other);
   vec2 g = vec2(pigAt(at + vec2(1.0, 0.0)) - pigAt(at - vec2(1.0, 0.0)),
                 pigAt(at + vec2(0.0, 1.0)) - pigAt(at - vec2(0.0, 1.0))) * 0.5 * uUnit;
 

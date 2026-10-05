@@ -6,8 +6,9 @@ import { luminance } from '../engine/color';
 import { LIBRARY, PALETTES, PRESETS, type Palette, generatePalette, randomizeConfig } from '../engine/palettes';
 import { DEFAULT_CONFIG, type DriftConfig, decodeConfig, encodeConfig } from '../engine/params';
 import { BrushInput, type Tool } from './brush';
-import { PaintEngine, type SheetMeta } from './engine';
-import { PAN_INK, PAN_NAMES, SIZES, type Settings, defaultSettings, lookOf, sanitizeSettings } from './settings';
+import { MAX_INKS, PaintEngine, type SheetMeta } from './engine';
+import { hueOf, rampFromHue, suggestInk } from './inks';
+import { PAN_INK, PAN_NAMES, SIZES, type Settings, copyPalette, defaultSettings, lookOf, sanitizeSettings } from './settings';
 import { loadSheet, saveSheet } from './storage';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -41,6 +42,8 @@ function saveSettings(): void {
 }
 
 const look = () => lookOf(settings);
+/** The ink the pans show and paint with. */
+const currentInk = () => settings.inks[settings.ink];
 
 // ---------------------------------------------------------------- toast
 
@@ -100,6 +103,7 @@ const input = new BrushInput(
   () => ({
     tool: settings.tool,
     ink: PAN_INK[settings.pan],
+    slot: settings.ink,
     radius: settings.radius,
   }),
   (x, y) => engine.toField(x, y, breathT),
@@ -213,8 +217,9 @@ const pos = (e: PointerEvent) => {
 
 canvas.addEventListener('pointerdown', (e) => {
   if (!engine.ready || (e.pointerType === 'mouse' && e.button !== 0)) return;
-  if (smallQuery.matches && app.dataset.sheet === 'open') {
+  if (smallQuery.matches && (app.dataset.sheet === 'open' || app.dataset.inks === 'open')) {
     openSheet(false);
+    openInks(false);
     return;
   }
   e.preventDefault();
@@ -277,7 +282,7 @@ function moveRing(x: number, y: number): void {
 }
 function syncRing(): void {
   ring.style.setProperty('--r', `${settings.radius}px`);
-  const c = settings.tool === 'pigment' ? settings.palette.colors[settings.pan] : 'var(--ink)';
+  const c = settings.tool === 'pigment' ? currentInk().colors[settings.pan] : 'var(--ink)';
   ring.style.setProperty('--c', c);
   ring.dataset.tool = settings.tool;
 }
@@ -310,7 +315,7 @@ function pickTool(tool: Tool, pan = settings.pan): void {
 
 function syncTools(): void {
   pans.forEach((b, i) => {
-    b.style.setProperty('--c', settings.palette.colors[i]);
+    b.style.setProperty('--c', currentInk().colors[i]);
     b.setAttribute('aria-checked', String(settings.tool === 'pigment' && settings.pan === i));
   });
   toolButtons.forEach((b) => b.setAttribute('aria-checked', String(settings.tool === b.dataset.tool)));
@@ -361,14 +366,15 @@ const sheetToggle = $('sheetToggle');
 function openSheet(open: boolean): void {
   app.dataset.sheet = open ? 'open' : 'closed';
   sheetToggle.setAttribute('aria-expanded', String(open));
+  if (open) openInks(false);
 }
 sheetToggle.addEventListener('click', () => openSheet(app.dataset.sheet !== 'open'));
 $('sheetDone').addEventListener('click', () => openSheet(false));
 
-// The generator gets your palette back (and the piece you started from, if any).
+// The generator gets your first ink back (and the piece you started from, if any).
 function generatorHref(): string {
   const base = (settings.piece && decodeConfig(settings.piece)) || DEFAULT_CONFIG;
-  const cfg: DriftConfig = { ...base, paper: settings.palette.paper, colors: [...settings.palette.colors] };
+  const cfg: DriftConfig = { ...base, paper: settings.inks[0].paper, colors: [...settings.inks[0].colors] };
   return `/#c=${encodeConfig(cfg)}`;
 }
 for (const id of ['toGenerator', 'backLink', 'brand']) {
@@ -386,7 +392,51 @@ for (const id of ['toGenerator', 'backLink', 'brand']) {
   });
 }
 
-// ---------------------------------------------------------------- sheet panel: palettes
+// ---------------------------------------------------------------- inks
+//
+// A painting holds up to three inks. Each is a five-color ramp; the pans show the
+// chosen one. Paint remembers its ink, so adding or switching inks never changes
+// what's already on the paper; recoloring an ink does, everywhere it was used.
+
+const inkBtn = $('inkBtn');
+const inkRow = $('inkRow');
+const hueInput = $<HTMLInputElement>('hue');
+
+function openInks(open: boolean): void {
+  app.dataset.inks = open ? 'open' : 'closed';
+  inkBtn.setAttribute('aria-expanded', String(open));
+  if (open) {
+    if (app.dataset.sheet === 'open') openSheet(false);
+    hueInput.value = String(Math.round(hueOf(currentInk())));
+  }
+}
+inkBtn.addEventListener('click', () => openInks(app.dataset.inks !== 'open'));
+$('inkDone').addEventListener('click', () => openInks(false));
+
+function selectInk(i: number): void {
+  settings.ink = Math.max(0, Math.min(settings.inks.length - 1, i));
+  saveSettings();
+  hueInput.value = String(Math.round(hueOf(currentInk())));
+  syncInks();
+}
+
+function addInk(): void {
+  if (settings.inks.length >= MAX_INKS) return;
+  settings.inks.push(suggestInk(settings.inks));
+  engine.setLook(look());
+  selectInk(settings.inks.length - 1);
+  toast('New ink. Pick its colors below, or just start painting.');
+}
+
+/** Recolors the chosen ink, and everything already painted with it. The first ink also sets the paper. */
+function recolorInk(p: Palette, animate = true): void {
+  const paper = settings.ink === 0 ? p.paper : settings.inks[0].paper;
+  settings.inks[settings.ink] = { ...copyPalette(p), paper };
+  saveSettings();
+  engine.setLook(look(), animate);
+  syncInks();
+  requestRender();
+}
 
 const library = $('library');
 const strips = LIBRARY.map((p) => {
@@ -397,28 +447,82 @@ const strips = LIBRARY.map((p) => {
   b.setAttribute('aria-label', `Palette ${p.name}`);
   b.style.setProperty('--paper', p.paper);
   b.innerHTML = p.colors.map((c) => `<i style="background:${c}"></i>`).join('');
-  b.addEventListener('click', () => setPalette({ ...p, colors: [...p.colors] }));
+  b.addEventListener('click', () => {
+    recolorInk(p);
+    hueInput.value = String(Math.round(hueOf(p)));
+  });
   library.append(b);
   return { b, p };
 });
-$('surprise').addEventListener('click', () => setPalette(generatePalette(Math.random)));
+$('surprise').addEventListener('click', () => {
+  const p = generatePalette(Math.random);
+  recolorInk(p);
+  hueInput.value = String(Math.round(hueOf(p)));
+});
+hueInput.addEventListener('input', () => recolorInk(rampFromHue(Number(hueInput.value), settings.inks[0].paper), false));
+hueInput.addEventListener('pointerdown', () => startScrub(hueInput.closest('.ctl')!));
 
-function setPalette(p: Palette, animate = true): void {
-  settings.palette = p;
-  saveSettings();
-  engine.setLook(look(), animate);
-  syncPalette();
-  requestRender();
+function swatch(colors: string[]): HTMLElement {
+  const el = document.createElement('span');
+  el.className = 'ink-swatch';
+  for (const c of colors) {
+    const i = document.createElement('i');
+    i.style.background = c;
+    el.append(i);
+  }
+  return el;
 }
 
-function syncPalette(): void {
-  const p = settings.palette;
-  for (const s of strips) s.b.setAttribute('aria-pressed', String(s.p.paper === p.paper && s.p.colors.join() === p.colors.join()));
-  const dark = luminance(p.paper) < 0.18;
+function syncInks(): void {
+  const ink = currentInk();
+  const paper = settings.inks[0];
+
+  // The dock's ink button: one little jar per ink, the chosen one standing up.
+  const jars = $('inkJars');
+  jars.replaceChildren(...settings.inks.map((p, i) => {
+    const j = document.createElement('i');
+    j.className = 'jar';
+    j.dataset.on = String(i === settings.ink);
+    j.style.background = `linear-gradient(${p.colors.map((c, k) => `${c} ${k * 20}% ${(k + 1) * 20}%`).join(', ')})`;
+    return j;
+  }));
+  inkBtn.title = `Ink ${settings.ink + 1} of ${settings.inks.length}: switch, add or recolor (I)`;
+
+  // The popover: the painting's inks, plus a way to add one.
+  const cards = settings.inks.map((p, i) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'ink-card';
+    b.setAttribute('role', 'radio');
+    b.setAttribute('aria-checked', String(i === settings.ink));
+    b.title = p.name;
+    const label = document.createElement('span');
+    label.className = 'ink-label';
+    label.textContent = i === 0 ? 'Ink 1 · sets the paper' : `Ink ${i + 1}`;
+    b.append(swatch(p.colors), label);
+    b.addEventListener('click', () => selectInk(i));
+    return b;
+  });
+  if (settings.inks.length < MAX_INKS) {
+    const add = document.createElement('button');
+    add.type = 'button';
+    add.className = 'ink-card ink-add';
+    add.innerHTML = '<span class="ink-plus" aria-hidden="true">+</span><span class="ink-label">Add an ink</span>';
+    add.addEventListener('click', addInk);
+    cards.push(add);
+  }
+  inkRow.replaceChildren(...cards);
+  $('inkColorsTitle').textContent = `Colors for ink ${settings.ink + 1}`;
+  $('inkNote').textContent = settings.inks.length === 1
+    ? 'Add an ink to paint in other colors. Paint keeps its ink, so earlier strokes stay as they are.'
+    : `Recoloring an ink changes everything painted with it${settings.ink === 0 ? ', and ink 1 sets the paper' : ''}.${settings.inks.length >= MAX_INKS ? ' Three inks per painting.' : ''}`;
+
+  for (const st of strips) st.b.setAttribute('aria-pressed', String(st.p.colors.join() === ink.colors.join()));
+  const dark = luminance(paper.paper) < 0.18;
   app.dataset.tone = dark ? 'dark' : 'light';
-  app.style.setProperty('--accent', accentFor(p.colors, dark));
-  document.body.style.background = p.paper;
-  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', p.paper);
+  app.style.setProperty('--accent', accentFor(paper.colors, dark));
+  document.body.style.background = paper.paper;
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', paper.paper);
   syncTools();
 }
 
@@ -486,7 +590,8 @@ function startScrub(ctl: HTMLElement): void {
 
 function adoptPiece(cfg: DriftConfig): void {
   const match = PALETTES.find((p) => p.paper === cfg.paper && p.colors.join() === cfg.colors.join());
-  settings.palette = { name: match?.name ?? 'From the generator', paper: cfg.paper, colors: [...cfg.colors] };
+  // The piece's palette becomes the first ink (and the paper); other inks stay.
+  settings.inks[0] = { name: match?.name ?? 'From the generator', paper: cfg.paper, colors: [...cfg.colors] };
   settings.layers = Math.round(cfg.layers);
   settings.edges = cfg.edge;
   settings.hueDrift = cfg.hueDrift;
@@ -500,7 +605,7 @@ function adoptPiece(cfg: DriftConfig): void {
 }
 
 function newDrift(): void {
-  const palette = settings.palette;
+  const palette = settings.inks[0];
   const cfg = randomizeConfig({ ...DEFAULT_CONFIG, paper: palette.paper, colors: [...palette.colors] }, new Set(['palette']));
   engine.compose(cfg);
   afterNewSheet();
@@ -611,10 +716,13 @@ addEventListener('keydown', (e) => {
     setRadius(settings.radius * 1.25);
   } else if (key === 'p') {
     openSheet(app.dataset.sheet !== 'open');
+  } else if (key === 'i') {
+    openInks(app.dataset.inks !== 'open');
   } else if (key === 'h') {
     app.dataset.zen = app.dataset.zen === 'true' ? 'false' : 'true';
   } else if (e.key === 'Escape') {
     if (app.dataset.sheet === 'open') openSheet(false);
+    else if (app.dataset.inks === 'open') openInks(false);
     else app.dataset.zen = 'false';
   }
 });
@@ -622,7 +730,7 @@ addEventListener('keydown', (e) => {
 // ---------------------------------------------------------------- start
 
 function syncAll(): void {
-  syncPalette();
+  syncInks();
   syncSliders();
   syncHistory();
   setRadius(settings.radius);
@@ -667,7 +775,7 @@ async function start(): Promise<void> {
     startFromPiece(piece, restored);
   } else if (!restored && !fresh) {
     const first = PRESETS[0].config;
-    engine.compose({ ...first, paper: settings.palette.paper, colors: [...settings.palette.colors] });
+    engine.compose({ ...first, paper: settings.inks[0].paper, colors: [...settings.inks[0].colors] });
   }
   syncAll();
   let seen = false;
@@ -677,8 +785,10 @@ async function start(): Promise<void> {
     /* show it */
   }
   hint.hidden = seen;
-  // ?open=paper opens the palette sheet (handy for links and screenshots).
-  if (new URLSearchParams(location.search).get('open') === 'paper') openSheet(true);
+  // ?open=paper or ?open=inks opens that panel (handy for links and screenshots).
+  const openParam = new URLSearchParams(location.search).get('open');
+  if (openParam === 'paper') openSheet(true);
+  if (openParam === 'inks') openInks(true);
   requestRender();
 }
 
@@ -726,6 +836,6 @@ if (import.meta.env.DEV) {
       checkpoint: () => engine.checkpoint(),
     });
   };
-  Object.assign(window, { __paint: { engine, input, settings, tick, snap, demo, setPalette, look } });
+  Object.assign(window, { __paint: { engine, input, settings, tick, snap, demo, recolorInk, selectInk, addInk, look } });
   if (new URLSearchParams(location.search).has('live')) void import('./demo').then((m) => m.runLive(canvas));
 }

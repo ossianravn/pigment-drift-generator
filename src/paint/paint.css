@@ -105,7 +105,9 @@
 .studio-hint[hidden] { display: none; }
 .studio-hint b { font-weight: 400; color: var(--accent); }
 .studio-hint span + span::before { content: '·'; margin-right: 14px; color: var(--ink-3); font-style: normal; }
-.studio-hint.is-gone { opacity: 0; transform: translate(-50%, 10px); }
+.studio-hint.is-gone,
+.app[data-inks='open'] .studio-hint,
+.app[data-sheet='open'] .studio-hint { opacity: 0; transform: translate(-50%, 10px); }
 @keyframes hint-in { from { opacity: 0; transform: translate(-50%, 12px); } }
 
 /* ---------- dock: five pans, water, blot, size ---------- */
@@ -198,22 +200,46 @@
 }
 .tool.size:hover i { background: var(--ink); }
 
-/* ---------- the paper sheet: palette, sliders, new sheet ---------- */
+/* ---------- ink button: one little jar per ink ---------- */
 
-.studio-sheet {
+.ink-btn {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 50px;
+  margin-right: 4px;
+  padding: 0;
+  border: 0;
+  border-radius: 13px 10px 14px 11px / 11px 14px 10px 13px;
+  background: transparent;
+  transition: background .2s ease;
+}
+.ink-btn:hover, .app[data-inks='open'] .ink-btn { background: rgba(38, 33, 46, .07); }
+.ink-jars { display: flex; align-items: flex-end; gap: 2px; height: 34px; }
+.jar {
+  display: block;
+  width: 9px;
+  height: 25px;
+  border-radius: 4px 5px 3px 6px / 6px 4px 5px 3px;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .12), 0 2px 5px -2px rgba(30, 20, 40, .5);
+  opacity: .5;
+  transition: height .25s cubic-bezier(.3, 1.5, .5, 1), opacity .2s ease, transform .2s ease;
+}
+.jar:only-child { width: 14px; }
+.jar[data-on='true'] { height: 34px; opacity: 1; }
+.ink-btn:hover .jar[data-on='true'] { transform: rotate(-5deg); }
+
+/* ---------- shared card look for the two panels ---------- */
+
+.studio-sheet, .ink-pop {
   position: fixed;
-  top: 86px;
-  right: 20px;
   z-index: 6;
   display: flex;
-  width: 340px;
-  max-height: calc(100dvh - 196px);
   background: var(--paper-card) var(--grain);
   border-radius: 18px 22px 17px 23px / 23px 17px 22px 18px;
   box-shadow: 0 30px 60px -30px rgba(38, 28, 50, .45), 0 2px 8px rgba(38, 28, 50, .08);
-  transition: transform .42s cubic-bezier(.7, 0, .2, 1), opacity .3s ease, background-color .2s ease, box-shadow .2s ease, visibility 0s;
 }
-.studio-sheet::before {
+.studio-sheet::before, .ink-pop::before {
   content: '';
   position: absolute;
   inset: 0;
@@ -222,6 +248,71 @@
   filter: url(#rough);
   pointer-events: none;
   transition: opacity .2s ease;
+}
+
+/* ---------- inks: switch, add, recolor ---------- */
+
+.ink-pop {
+  left: 50%;
+  bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+  width: min(440px, calc(100vw - 32px));
+  max-height: calc(100dvh - 200px);
+  transform: translateX(-50%);
+  transition: transform .35s cubic-bezier(.2, .8, .2, 1), opacity .25s ease, background-color .2s ease, box-shadow .2s ease, visibility 0s;
+}
+.app[data-inks='closed'] .ink-pop {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translate(-50%, 14px);
+  transition: transform .3s ease, opacity .2s ease, visibility 0s .3s;
+}
+.ink-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0 2px; }
+.ink-card {
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+  padding: 7px 8px 6px;
+  border: 0;
+  border-radius: 12px 10px 13px 9px / 10px 13px 9px 12px;
+  background: transparent;
+  box-shadow: 0 0 0 1px var(--line);
+  font-size: 11.5px;
+  color: var(--ink-2);
+  transition: box-shadow .15s ease, transform .2s ease, color .15s ease;
+}
+.ink-card:hover { color: var(--ink); transform: rotate(-1deg); }
+.ink-card[aria-checked='true'] { box-shadow: 0 0 0 2px var(--ink); color: var(--ink); }
+.ink-swatch { display: flex; width: 104px; height: 22px; overflow: hidden; border-radius: 6px 8px 5px 9px / 8px 5px 9px 6px; }
+.ink-swatch i { flex: 1; }
+.ink-add { align-content: center; justify-items: center; min-width: 120px; box-shadow: none; outline: 1px dashed var(--line-strong); outline-offset: -1px; }
+.ink-plus { font: 400 26px/.8 var(--serif); color: var(--accent); }
+.ink-pop .library { margin-top: 10px; }
+
+/* The hue track shows the inks it mixes (OKLCH, the same space the ramp is built in). */
+input.hue-range[type='range'] { height: 26px; }
+input.hue-range[type='range']::-webkit-slider-runnable-track {
+  height: 12px;
+  border-radius: 7px 6px 8px 6px;
+  background: linear-gradient(to right, oklch(.62 .15 0), oklch(.62 .15 45), oklch(.62 .15 90), oklch(.62 .15 135), oklch(.62 .15 180), oklch(.62 .15 225), oklch(.62 .15 270), oklch(.62 .15 315), oklch(.62 .15 359));
+}
+input.hue-range[type='range']::-moz-range-track {
+  height: 12px;
+  border-radius: 7px;
+  background: linear-gradient(to right, oklch(.62 .15 0), oklch(.62 .15 45), oklch(.62 .15 90), oklch(.62 .15 135), oklch(.62 .15 180), oklch(.62 .15 225), oklch(.62 .15 270), oklch(.62 .15 315), oklch(.62 .15 359));
+}
+input.hue-range[type='range']::-moz-range-progress { background: transparent; }
+input.hue-range[type='range']::-webkit-slider-thumb { margin-top: -1.5px; background: var(--paper-solid); box-shadow: 0 0 0 1.5px var(--ink), 0 2px 5px rgba(30, 20, 40, .35); }
+input.hue-range[type='range']::-moz-range-thumb { background: var(--paper-solid); box-shadow: 0 0 0 1.5px var(--ink); }
+
+/* ---------- the paper sheet: sliders, new sheet ---------- */
+
+.studio-sheet {
+  top: 86px;
+  right: 20px;
+  width: 340px;
+  max-height: calc(100dvh - 196px);
+  transition: transform .42s cubic-bezier(.7, 0, .2, 1), opacity .3s ease, background-color .2s ease, box-shadow .2s ease, visibility 0s;
 }
 .app[data-sheet='closed'] .studio-sheet {
   transform: translateX(calc(100% + 40px));
@@ -242,12 +333,10 @@
 .swatch-strip[aria-pressed='true'] { box-shadow: 0 0 0 2px var(--ink); transform: rotate(-1.5deg); }
 
 /* Dragging a slider: only that slider stays, so you watch the painting change. */
-.app[data-scrub='true'] .studio-sheet { background: transparent; box-shadow: none; }
-.app[data-scrub='true'] .studio-sheet::before { opacity: 0; }
-.app[data-scrub='true'] .studio-sheet-head,
-.app[data-scrub='true'] .studio-section > :not(#sliders),
-.app[data-scrub='true'] .studio-section:not(:has(.is-scrubbing)),
-.app[data-scrub='true'] .studio-sheet .panel-foot,
+.app[data-scrub='true'] :is(.studio-sheet, .ink-pop) { background: transparent; box-shadow: none; }
+.app[data-scrub='true'] :is(.studio-sheet, .ink-pop)::before { opacity: 0; }
+.app[data-scrub='true'] .studio-sheet-inner > :not(:has(.is-scrubbing)),
+.app[data-scrub='true'] .studio-section > :not(:has(.is-scrubbing)):not(.is-scrubbing),
 .app[data-scrub='true'] #sliders .ctl:not(.is-scrubbing),
 .app[data-scrub='true'] .studio-top,
 .app[data-scrub='true'] .studio-dock { opacity: 0; pointer-events: none; transition: opacity .18s ease; }
@@ -259,12 +348,14 @@
 .app[data-painting='true'] .studio-top,
 .app[data-painting='true'] .studio-dock,
 .app[data-painting='true'] .studio-sheet,
+.app[data-painting='true'] .ink-pop,
 .app[data-painting='true'] .toast { opacity: .12; pointer-events: none; transition: opacity .2s ease; }
 
 /* H hides everything but the painting. */
 .app[data-zen='true'] .studio-top,
 .app[data-zen='true'] .studio-dock,
-.app[data-zen='true'] .studio-sheet { opacity: 0; pointer-events: none; }
+.app[data-zen='true'] .studio-sheet,
+.app[data-zen='true'] .ink-pop { opacity: 0; pointer-events: none; }
 
 /* ---------- phones ---------- */
 
@@ -287,11 +378,13 @@
     transform: none;
   }
   .pans, .tools { gap: 0; }
-  .pan { width: 38px; }
-  .pan i { width: 30px; height: 30px; }
-  .tool { width: 38px; height: 40px; }
+  .ink-btn { width: 32px; height: 46px; margin-right: 0; }
+  .pan { width: 36px; }
+  .pan i { width: 29px; height: 29px; }
+  .tool { width: 36px; height: 40px; }
   .dock-rule { margin: 0 1px; height: 26px; }
-  .app[data-sheet='open'] .studio-dock { opacity: 0; pointer-events: none; }
+  .app[data-sheet='open'] .studio-dock,
+  .app[data-inks='open'] .studio-dock { opacity: 0; pointer-events: none; }
 
   /* Three short lines read better than one wrapped one. */
   .studio-hint { bottom: calc(82px + env(safe-area-inset-bottom, 0px)); flex-direction: column; gap: 1px; font-size: 16.5px; padding: 10px 18px; }
@@ -307,9 +400,28 @@
     border-radius: 22px 24px 18px 20px / 20px 22px 18px 24px;
   }
   .app[data-sheet='closed'] .studio-sheet { transform: translateY(calc(100% + 30px)); }
+  .ink-pop {
+    left: 8px;
+    right: 8px;
+    bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+    width: auto;
+    max-height: 72dvh;
+    transform: none;
+    border-radius: 22px 24px 18px 20px / 20px 22px 18px 24px;
+  }
+  .app[data-inks='closed'] .ink-pop { transform: translateY(calc(100% + 30px)); }
   .studio-sheet-inner { padding: 16px 16px 14px; }
-  .studio-sheet .library { display: flex; gap: 8px; overflow-x: auto; margin: 2px -16px 0; padding: 4px 16px 6px; scrollbar-width: none; }
-  .studio-sheet .library::-webkit-scrollbar { display: none; }
-  .studio-sheet .swatch-strip { flex: none; width: 116px; height: 30px; }
+  .ink-swatch { width: 84px; }
+  .ink-add { min-width: 100px; }
+  .ink-pop .library { display: flex; gap: 8px; overflow-x: auto; margin: 10px -16px 0; padding: 4px 16px 6px; scrollbar-width: none; }
+  .ink-pop .library::-webkit-scrollbar { display: none; }
+  .ink-pop .swatch-strip { flex: none; width: 116px; height: 30px; }
   .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
+}
+
+/* The narrowest phones: tighten the dock so it stays on one row. */
+@media (max-width: 380px) {
+  .pan, .tool { width: 33px; }
+  .pan i { width: 27px; height: 27px; }
+  .ink-btn { width: 30px; }
 }

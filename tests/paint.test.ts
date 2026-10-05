@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { BrushInput, type BrushState } from '../src/paint/brush';
 import { Kind } from '../src/paint/engine';
+import { hueOf, rampFromHue, suggestInk } from '../src/paint/inks';
 import { breathe, fbm, gnoise } from '../src/paint/noise';
+import { luminance } from '../src/engine/color';
+import { PALETTES } from '../src/engine/palettes';
 import { PAN_INK, defaultSettings, lookOf, sanitizeSettings } from '../src/paint/settings';
 
 const ev = (pointerId: number) => ({ pointerId, pointerType: 'touch', pressure: 0.5, target: null }) as unknown as PointerEvent;
@@ -9,7 +12,7 @@ const ev = (pointerId: number) => ({ pointerId, pointerType: 'touch', pressure: 
 /** A brush on a 1:1 sheet (1 texel per CSS px, y flipped like the real mapping) with a hand-driven clock. */
 function rig(state: Partial<BrushState> = {}) {
   let now = 0;
-  const brush: BrushState = { tool: 'pigment', ink: 0.8, radius: 20, ...state };
+  const brush: BrushState = { tool: 'pigment', ink: 0.8, slot: 0, radius: 20, ...state };
   const input = new BrushInput(() => brush, (x, y) => [x, 1000 - y], () => 1, () => now);
   const frame = (ms = 1000 / 60) => {
     now += ms;
@@ -112,6 +115,17 @@ describe('brush input', () => {
     expect([segs[0].ax, segs.at(-1)!.bx]).toEqual([0, 900]);
   });
 
+  it('paints with the chosen ink', () => {
+    const { input, frame, brush } = rig({ slot: 2 });
+    input.down(ev(1), 100, 100);
+    input.up(ev(1));
+    expect(frame().drops[0].slot).toBe(2);
+    brush.slot = 1;
+    input.down(ev(2), 100, 100);
+    input.move(ev(2), 140, 100);
+    expect(frame().segs.every((seg) => seg.slot === 1)).toBe(true);
+  });
+
   it('handles several fingers at once', () => {
     const { input, frame } = rig();
     input.down(ev(1), 100, 100);
@@ -137,10 +151,21 @@ describe('studio settings', () => {
     expect(s.tool).toBe('pigment');
   });
 
-  it('keeps a valid palette and drops an invalid one', () => {
-    const palette = { name: 'Mine', paper: '#ffffff', colors: ['#000000', '#111111', '#222222', '#333333', '#444444'] };
-    expect(sanitizeSettings({ palette }, base).palette).toEqual(palette);
-    expect(sanitizeSettings({ palette: { ...palette, colors: ['#000'] } }, base).palette).toEqual(base.palette);
+  const mine = { name: 'Mine', paper: '#ffffff', colors: ['#000000', '#111111', '#222222', '#333333', '#444444'] };
+
+  it('keeps valid inks, drops invalid ones, and holds at most three', () => {
+    expect(sanitizeSettings({ inks: [mine] }, base).inks).toEqual([mine]);
+    expect(sanitizeSettings({ inks: [{ ...mine, colors: ['#000'] }] }, base).inks).toEqual(base.inks);
+    expect(sanitizeSettings({ inks: [mine, mine, mine, mine] }, base).inks).toHaveLength(3);
+  });
+
+  it('carries a single palette from before inks over as the first ink', () => {
+    expect(sanitizeSettings({ palette: mine }, base).inks).toEqual([mine]);
+  });
+
+  it('keeps the chosen ink within the inks there are', () => {
+    expect(sanitizeSettings({ inks: [mine, mine], ink: 5 }, base).ink).toBe(1);
+    expect(sanitizeSettings({ inks: [mine], ink: 1 }, base).ink).toBe(0);
   });
 
   it('only accepts share-token-shaped piece references', () => {
@@ -155,7 +180,8 @@ describe('studio settings', () => {
 
   it('orders the pans from deepest to palest', () => {
     expect([...PAN_INK].sort((a, b) => b - a)).toEqual(PAN_INK);
-    expect(lookOf(base).colors).toEqual(base.palette.colors);
+    expect(lookOf(base).inks).toEqual([base.inks[0].colors]);
+    expect(lookOf(base).paper).toBe(base.inks[0].paper);
   });
 });
 
@@ -172,5 +198,32 @@ describe('breathing noise (CPU twin of the shader)', () => {
       const [x, y] = breathe(120 + t * 50, 340, 700, [12, -40], 1, t);
       expect(Math.hypot(x, y)).toBeLessThan(700 * 0.03);
     }
+  });
+});
+
+describe('inks', () => {
+  it('builds a deep-to-pale ramp around any hue', () => {
+    for (const hue of [0, 95, 210, 330]) {
+      const ink = rampFromHue(hue, '#fdf1e3');
+      expect(ink.colors).toHaveLength(5);
+      const lum = ink.colors.map(luminance);
+      expect(lum.every((l, i) => i === 0 || l > lum[i - 1])).toBe(true);
+      expect(Math.min(Math.abs(hueOf(ink) - hue), 360 - Math.abs(hueOf(ink) - hue))).toBeLessThan(25);
+      expect(ink.paper).toBe('#fdf1e3');
+    }
+  });
+
+  it('runs the ramp the other way on dark paper, like the dark palettes', () => {
+    const lum = rampFromHue(200, '#121020').colors.map(luminance);
+    expect(lum[0]).toBeGreaterThan(lum[4]);
+  });
+
+  it('suggests a new ink that is not already in use, on the same kind of paper', () => {
+    const first = PALETTES.find((p) => p.name === 'Soft Current')!;
+    const next = suggestInk([first]);
+    expect(next.colors).not.toEqual(first.colors);
+    expect(luminance(next.paper) > 0.18).toBe(true);
+    const night = PALETTES.find((p) => p.name === 'Night Ink')!;
+    expect(luminance(suggestInk([night]).paper)).toBeLessThan(0.18);
   });
 });
