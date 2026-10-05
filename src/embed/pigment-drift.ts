@@ -12,7 +12,7 @@
 import { type DriftConfig, sanitizeConfig } from '../engine/params';
 import { DriftRenderer } from '../engine/renderer';
 
-export const VERSION = '1.0.0';
+export { VERSION } from './version';
 
 /** Max pixels drawn per animated frame (~1460×910). */
 const PIXEL_BUDGET = 1.33e6;

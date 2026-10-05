@@ -1,6 +1,5 @@
 node_modules
 dist
-public/embed
 *.log
 .DS_Store
 .vite

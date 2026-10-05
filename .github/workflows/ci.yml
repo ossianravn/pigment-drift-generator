@@ -29,4 +29,34 @@ jobs:
           docker run -d --name pd -p 8080:80 pigment-drift
           for i in $(seq 1 20); do curl -fs http://localhost:8080/healthz && break; sleep 1; done
           curl -fs http://localhost:8080/ | grep -q "Pigment Drift"
-          curl -fsI http://localhost:8080/embed/pigment-drift.min.js | grep -qi "access-control-allow-origin"
+
+
+  # The embed runtime is committed (embed/) and served by jsDelivr from the tag
+  # embed-v<version>. Keep the committed build honest and released versions immutable.
+  embed:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Committed runtime matches the source
+        run: |
+          npm run build:embed
+          git diff --exit-code -- embed/ || { echo "::error::embed/ is out of date. Run npm run build:embed and commit the result."; exit 1; }
+      - name: Tag new versions, never change released ones
+        run: |
+          TAG=$(node -p "require('./embed/release.json').tag")
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            git diff --exit-code "$TAG" HEAD -- embed/pigment-drift.min.js || {
+              echo "::error::The runtime changed but $TAG is already published. Bump VERSION in src/embed/version.ts."; exit 1; }
+          elif [ "$GITHUB_EVENT_NAME" = "push" ] && [ "$GITHUB_REF" = "refs/heads/main" ]; then
+            git tag "$TAG" && git push origin "$TAG"
+            echo "Published $TAG: https://cdn.jsdelivr.net/gh/${GITHUB_REPOSITORY}@$TAG/embed/pigment-drift.min.js"
+          fi

@@ -89,8 +89,15 @@ ${sources}
   return { html, css };
 }
 
+/** Where jsDelivr serves a released runtime: straight from this repo at its version tag. */
+export function cdnUrl(release: { tag: string; file: string }): string {
+  return `https://cdn.jsdelivr.net/gh/ossianravn/pigment-drift-generator@${release.tag}/embed/${release.file}`;
+}
+
 export interface EmbedOptions {
   scriptSrc: string;
+  /** SRI hash, for scripts loaded from a CDN. */
+  integrity?: string;
   poster?: string;
   still: boolean;
   fps: number;
@@ -110,7 +117,8 @@ export function embedSnippet(cfg: DriftConfig, o: EmbedOptions): { html: string;
   config='${attr(json)}'></pigment-drift>
 
 <!-- Once per page, anywhere -->
-<script src="${o.scriptSrc}" defer></script>`;
+<script src="${o.scriptSrc}"${o.integrity ? `
+  integrity="${o.integrity}" crossorigin="anonymous"` : ''} defer></script>`;
   const css = `.pd-bg {
   position: fixed;          /* use "absolute" to sit behind a single section */
   inset: 0;

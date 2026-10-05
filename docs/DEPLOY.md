@@ -48,9 +48,10 @@ Click **Deploy**. With **Autodeploy** on (General), every push to `main` redeplo
 Check:
 
 - `https://pigmentdrift.ossianravn.dev/healthz` → `ok` (the container health check uses this too).
-- `https://pigmentdrift.ossianravn.dev/embed/pigment-drift.min.js` loads, with `Access-Control-Allow-Origin: *`.
-- The generator opens, animates, and **Export → Live embed → Script → Load it from pigmentdrift.ossianravn.dev** produces a hot-linkable snippet.
+- The generator opens and animates.
+
+The embed script is not served from this server. Sites self-host it or load it from jsDelivr (see the README).
 
 ## Caching
 
-nginx serves fingerprinted `/assets/*` as immutable for a year, `/embed/*` for an hour (keep that path stable, since other sites may hot-link it), and `index.html` with `no-cache`, so deploys show up immediately.
+nginx serves fingerprinted `/assets/*` as immutable for a year and `index.html` with `no-cache`, so deploys show up immediately.

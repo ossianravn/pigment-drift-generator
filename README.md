@@ -96,6 +96,15 @@ Every format follows the same pattern: one element as the first thing inside `<b
 
 Behind a single section instead? Use `position: absolute`, and give the section `position: relative; isolation: isolate;`.
 
+**Where the script comes from.** Self-host `pigment-drift.min.js` (it's in every embed pack), or load it from [jsDelivr](https://www.jsdelivr.com/), a free public CDN that serves it straight from this repository:
+
+```html
+<script src="https://cdn.jsdelivr.net/gh/ossianravn/pigment-drift-generator@embed-v1.0.0/embed/pigment-drift.min.js"
+  integrity="sha384-…" crossorigin="anonymous" defer></script>
+```
+
+CDN URLs are pinned to a version tag and never change underneath your site. The generator's *Live embed* tab writes this tag for you, with the exact integrity hash.
+
 The runtime pauses when the element is off-screen or the tab is hidden, and draws a single still for visitors who prefer reduced motion. It keeps animation within a pixel budget, recovers from WebGL context loss, and falls back to the poster image without WebGL2.
 
 <details>
@@ -176,7 +185,8 @@ src/
   engine/   parameter schema, palettes, color math, the shader, WebGL2 renderer
   app/      the generator UI: store + history, stage, control panel, screensaver, export dialog
   export/   tiled offscreen rendering, video encoding (WebCodecs via mediabunny), zip packs, snippets
-  embed/    the <pigment-drift> runtime → public/embed/pigment-drift.min.js
+  embed/    the <pigment-drift> runtime source
+embed/      the built runtime (committed; jsDelivr serves it from version tags)
 tests/      vitest unit tests
 ```
 
@@ -196,7 +206,7 @@ npm run build      # production build in dist/
 
 ## Self-host
 
-It's a static site: all rendering happens in the visitor's browser. The `Dockerfile` builds it and serves it with nginx, with gzip, immutable caching for hashed assets, CORS on `/embed/` so the runtime can be hot-linked, and `/healthz` for health checks.
+It's a static site: all rendering happens in the visitor's browser. The `Dockerfile` builds it and serves it with nginx, with gzip, immutable caching for hashed assets and `/healthz` for health checks. Your server never hosts the embed script for other sites; that's jsDelivr's job.
 
 ```bash
 docker build -t pigment-drift .
@@ -214,6 +224,9 @@ On **Dokploy**, create an Application from this repository with Build Type **Doc
 | Exported images and videos | ✓ | ✓ | ✓ |
 
 ## Contributing
+
+**Changing the embed runtime?** Run `npm run build:embed` and commit `embed/`, and bump `VERSION` in [`src/embed/version.ts`](src/embed/version.ts) if the output changed. CI checks the committed build matches the source. On `main` it tags `embed-v<version>` so jsDelivr can serve it, and it refuses to change a version that's already published.
+
 
 Issues and pull requests are welcome. Please run `npm run typecheck && npm test` before opening a PR, and for changes to the look, include before/after renders of a few presets.
 

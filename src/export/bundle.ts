@@ -30,18 +30,6 @@ export function download(data: Blob | string, filename: string, type = 'text/pla
   setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
 
-let runtimeCache: Promise<string> | null = null;
-
-/** The standalone embed runtime, served next to the app at /embed/. */
-export function fetchRuntime(): Promise<string> {
-  runtimeCache ??= fetch(`${import.meta.env.BASE_URL}embed/pigment-drift.min.js`).then((r) => {
-    if (!r.ok) throw new Error('Could not load the embed runtime (run `npm run build:embed`).');
-    return r.text();
-  });
-  runtimeCache.catch(() => (runtimeCache = null));
-  return runtimeCache;
-}
-
 export function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`;

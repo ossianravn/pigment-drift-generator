@@ -3,7 +3,10 @@
 
 import { type DriftConfig, parseConfigText } from '../engine/params';
 import { gzipSync, strToU8 } from 'fflate';
-import { download, fetchRuntime, formatBytes, type PackFile, zip } from '../export/bundle';
+import release from '../../embed/release.json';
+import runtime from '../../embed/pigment-drift.min.js?raw';
+import { download, formatBytes, type PackFile, zip } from '../export/bundle';
+import { cdnUrl } from '../export/snippets';
 import { canvasToBlob, renderToCanvas } from '../export/render';
 import { configJson, embedSnippet, examplePage, imageSnippet, readme, videoSnippet } from '../export/snippets';
 import { encodeLoop, MIME, pickCodec, type VideoContainer, type VideoQuality, webCodecsAvailable } from '../export/video';
@@ -57,7 +60,7 @@ export class ExportDialog {
     animate: true,
     efps: 30,
     equality: 0.75,
-    hotlink: false,
+    cdn: false,
   };
 
   constructor(private store: Store, private toast: (msg: string) => void) {
@@ -223,12 +226,13 @@ export class ExportDialog {
   }
 
   private scriptSrc(): string {
-    return this.opts.hotlink ? `${location.origin}${import.meta.env.BASE_URL}embed/pigment-drift.min.js` : 'pigment-drift.min.js';
+    return this.opts.cdn ? cdnUrl(release) : 'pigment-drift.min.js';
   }
 
   private embedSnippet() {
     return embedSnippet(this.config, {
       scriptSrc: this.scriptSrc(),
+      integrity: this.opts.cdn ? release.integrity : undefined,
       poster: 'pigment-drift-poster.webp',
       still: !this.opts.animate,
       fps: this.opts.efps,
@@ -255,9 +259,9 @@ export class ExportDialog {
           { id: '0.75', label: 'Balanced (recommended)' },
           { id: '1', label: 'Full resolution' },
         ], 'Render quality')}
-        ${this.select('hotlink', String(this.opts.hotlink), [
+        ${this.select('cdn', String(this.opts.cdn), [
           { id: 'false', label: 'Self-host the script (included in the pack)' },
-          { id: 'true', label: `Load it from ${location.host}` },
+          { id: 'true', label: `Load it from jsDelivr (free CDN, v${release.version})` },
         ], 'Script')}
       </div>
       <div class="actions">
@@ -266,7 +270,7 @@ export class ExportDialog {
       </div>
       <div class="progress" data-progress hidden><i></i><span></span></div>
       <ol class="steps">
-        <li>${this.opts.hotlink ? 'Nothing to upload — the script loads from this site.' : 'Upload <code>pigment-drift.min.js</code> and the poster next to your page.'}</li>
+        <li>${this.opts.cdn ? 'Upload the poster next to your page. The script comes from jsDelivr, pinned to this version and checked with an integrity hash.' : 'Upload <code>pigment-drift.min.js</code> and the poster next to your page.'}</li>
         <li>Paste the HTML as the first thing inside <code>&lt;body&gt;</code>, and the CSS into your stylesheet. The config lives in the element, so you can tweak it by hand.</li>
       </ol>
       ${this.code([
@@ -337,12 +341,8 @@ export class ExportDialog {
 
     if (this.tab === 'image') this.renderPreviews();
     if (this.tab === 'embed') {
-      fetchRuntime()
-        .then((src) => {
-          const el = d.querySelector('[data-runtime-size]');
-          if (el) el.textContent = `One ${formatBytes(src.length)} script (${formatBytes(gzipSync(strToU8(src)).length)} gzipped)`;
-        })
-        .catch(() => {});
+      const el = d.querySelector('[data-runtime-size]');
+      if (el) el.textContent = `One ${formatBytes(runtime.length)} script (${formatBytes(gzipSync(strToU8(runtime)).length)} gzipped)`;
     }
   }
 
@@ -465,19 +465,17 @@ export class ExportDialog {
       case 'video-pack':
         return this.run(() => this.videoExport(action === 'video-pack'));
       case 'embed-script':
-        return this.run(async () => download(await fetchRuntime(), 'pigment-drift.min.js', 'text/javascript'));
+        return this.run(async () => download(runtime, 'pigment-drift.min.js', 'text/javascript'));
       case 'embed-pack':
         return this.run(async () => {
           this.progress(0.2, 'Painting the poster…');
           const poster = await this.still({ id: 'poster', label: '', cssW: 1440, cssH: 900, density: 1 }, 'image/webp');
-          this.progress(0.6, 'Fetching the runtime…');
-          const runtime = await fetchRuntime();
           const snip = this.embedSnippet();
           const pack: PackFile[] = [
             { name: 'pigment-drift-poster.webp', data: poster },
             { name: 'config.json', data: configJson(cfg, true) },
           ];
-          if (!this.opts.hotlink) pack.push({ name: 'pigment-drift.min.js', data: runtime });
+          if (!this.opts.cdn) pack.push({ name: 'pigment-drift.min.js', data: runtime });
           this.addDocs(pack, 'embed', snip, [
             'Attributes: `still`, `phase` (0–1), `fps`, `quality` (0.25–1 render scale), `max-dpr`, `poster`.',
             'The element pauses when scrolled out of view or in a background tab, and draws a single still frame for visitors who prefer reduced motion.',
