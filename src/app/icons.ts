@@ -22,6 +22,7 @@ const P: Record<string, string> = {
   film: '<rect x="3.4" y="5" width="17.2" height="14" rx="2" transform="rotate(1 12 12)"/><path d="m10 9.2 5.2 2.9-5.2 2.8z"/>',
   code: '<path d="M8.4 7.2 3.8 12.1l4.6 4.7M15.6 7.2l4.6 4.9-4.6 4.7M13.4 5.2c-1 4.6-1.9 9.2-2.9 13.7"/>',
   braces: '<path d="M8.6 4.2c-2.6 0-2.6 1.6-2.6 3.6s-.4 3.4-2.2 4.2c1.8.8 2.2 2.2 2.2 4.2s0 3.6 2.6 3.6M15.4 4.2c2.6 0 2.6 1.6 2.6 3.6s.4 3.4 2.2 4.2c-1.8.8-2.2 2.2-2.2 4.2s0 3.6-2.6 3.6"/>',
+  pause: '<rect x="6.6" y="5.3" width="3.8" height="13.5" rx="1.5" transform="rotate(-1.5 8.5 12)"/><rect x="13.6" y="5.1" width="3.8" height="13.7" rx="1.5" transform="rotate(1.8 15.5 12)"/>',
   play: '<path d="M7.6 5.2c4.1 2.2 7.7 4.4 11 6.8-3.4 2.4-7 4.6-11 6.8-.3-4.6-.3-9.1 0-13.6Z"/>',
   anchorBottom: '<rect x="4" y="4" width="16" height="16" rx="2.4"/><path d="M4.4 14.6c2.6-1.6 5-1.8 7.6-.6s5 1 7.6-.5V18c0 1.1-.9 2-2 2H6.4c-1.1 0-2-.9-2-2z" fill="currentColor" opacity=".55"/>',
   anchorTop: '<rect x="4" y="4" width="16" height="16" rx="2.4"/><path d="M19.6 9.4c-2.6 1.6-5 1.8-7.6.6s-5-1-7.6.5V6c0-1.1.9-2 2-2h11.2c1.1 0 2 .9 2 2z" fill="currentColor" opacity=".55"/>',

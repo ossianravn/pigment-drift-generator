@@ -80,7 +80,9 @@
       </aside>
 
       <div class="dock" id="dock">
-        <div class="dock-group sketch-box">
+        <div class="dock-group mode-group sketch-box">
+          <!-- Phones swap the Still/Moving switch for this single play/pause button. -->
+          <button class="icon-btn play-toggle" type="button" id="playToggle"></button>
           <div class="seg" role="radiogroup" aria-label="Still or moving" id="modeSeg">
             <button role="radio" data-mode="still">Still</button>
             <button role="radio" data-mode="moving">Moving</button>

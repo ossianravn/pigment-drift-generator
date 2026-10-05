@@ -118,6 +118,7 @@ function bindSeg(id: string, attr: string, onPick: (v: string) => void): HTMLBut
   return buttons;
 }
 const modeButtons = bindSeg('modeSeg', 'mode', (m) => store.set({ mode: m as Mode }));
+$('playToggle').addEventListener('click', () => store.set({ mode: store.state.mode === 'moving' ? 'still' : 'moving' }));
 const deviceButtons = bindSeg('deviceSeg', 'device', (d) => store.set({ device: d as Device }));
 
 // ---------- reflect state in chrome ----------
@@ -125,6 +126,13 @@ const app = $('app');
 function syncChrome(): void {
   const { config, mode, device, panelOpen, immersive } = store.state;
   modeButtons.forEach((b) => b.setAttribute('aria-checked', String(b.dataset.mode === mode)));
+  const play = $('playToggle');
+  const playLabel = mode === 'moving' ? 'Pause (Space)' : 'Play (Space)';
+  if (play.title !== playLabel) {
+    play.title = playLabel;
+    play.setAttribute('aria-label', mode === 'moving' ? 'Pause' : 'Play');
+    play.innerHTML = icon(mode === 'moving' ? 'pause' : 'play');
+  }
   deviceButtons.forEach((b) => b.setAttribute('aria-checked', String(b.dataset.device === device)));
   app.dataset.panel = panelOpen ? 'open' : 'closed';
   app.dataset.mode = mode;

@@ -450,6 +450,8 @@ input[type='range']:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 1px 
 .seg button:hover { color: var(--ink); }
 .seg button[aria-checked='true'] { background: var(--ink); color: var(--paper-solid); }
 
+.play-toggle { display: none; }
+.play-toggle svg * { fill: currentColor; }
 .timeline { display: flex; align-items: center; gap: 10px; width: 210px; padding-right: 8px; }
 .timeline input { flex: 1; }
 .time { font: 12px var(--mono); color: var(--ink-2); min-width: 42px; text-align: right; font-variant-numeric: tabular-nums; }
@@ -674,21 +676,30 @@ dialog.is-busy .ex-tabs { opacity: .5; }
   /* Hold-to-peek steps the card aside. */
   .app[data-peek='true'] .panel { opacity: 0; transform: translateY(24px); }
 
+  /* One row: [play/pause · timeline · time] [phone|desktop] [controls] [fullscreen].
+     The timeline takes whatever width is left, so nothing wraps. */
   .dock {
     left: 10px;
     right: 10px;
-    bottom: 10px;
-    flex-wrap: wrap;
-    gap: 8px;
+    bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+    flex-wrap: nowrap;
+    justify-content: stretch;
+    gap: 6px;
   }
-  .app[data-panel='closed'] .dock { right: 10px; }
+  .app[data-panel='closed'] .dock,
+  .app[data-immersive='true'] .dock,
+  .app[data-immersive='true'][data-panel] .dock { left: 10px; right: 10px; }
   .app[data-panel='open'] .dock { opacity: 0; pointer-events: none; }
-  .dock > * { pointer-events: auto; }
-  .timeline { width: 140px; }
-  .seg button { padding: 0 10px; }
+  .dock > * { pointer-events: auto; flex: none; }
+  .dock .mode-group { flex: 1 1 auto; min-width: 0; gap: 2px; padding: 0 4px; }
+  .mode-group .seg { display: none; }
+  .play-toggle { display: inline-grid; width: 36px; height: 36px; background: transparent; }
+  .timeline { width: auto; flex: 1; min-width: 0; gap: 8px; padding-right: 6px; }
+  .device-group { padding: 0 4px; }
+  .seg button { padding: 0 9px; }
   #deviceSeg button span:last-child { display: none; }
   .seed-box { display: none; }
-  .toast { bottom: 128px; }
+  .toast { bottom: calc(72px + env(safe-area-inset-bottom, 0px)); }
 
   .sheet-head { padding: 18px 18px 10px; }
   .sheet-head h2 { font-size: 30px; }
