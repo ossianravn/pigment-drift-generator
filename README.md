@@ -59,7 +59,7 @@ The idea comes from [David East's Twitter post](https://x.com/_davideast/status/
 - **Tweak or randomize.** About 20 parameters across *Pigment, Composition, Current, Paper & texture* and *Motion*. Lock the groups you like, then randomize the rest, or roll the dice on a single group.
 - **Still or moving.** Every piece is a seamless loop. Pause on any moment to export it as a still.
 - **Desktop and mobile.** Compositions adapt to any aspect ratio. Flip the preview to a phone (or, on a phone, to a desktop screen) to check both.
-- **You always see what you're changing.** Dragging a slider turns the panel to glass, so only that slider stays on screen. On phones the controls are a short card showing one control at a time, picked from a rail of chips; hold the eye button to peek at the whole piece.
+- **You always see what you're changing.** Dragging a slider turns the panel to glass, so only that slider stays on screen. On phones the controls are a short card showing one control at a time: swipe sideways to step through them, or pick one from the rail of chips. Hold the eye button to peek at the whole piece.
 - **Screensaver view.** Fullscreen and artwork-only; the controls come back only while you move the mouse.
 - **Share links and undo.** The URL always holds the current piece; undo and redo cover every change.
 

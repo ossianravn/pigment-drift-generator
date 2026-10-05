@@ -622,7 +622,8 @@ dialog.is-busy .ex-tabs { opacity: .5; }
     border-radius: 22px 24px 18px 20px / 20px 22px 18px 24px;
   }
   .app[data-panel='closed'] .panel { transform: translateY(calc(100% + 30px)); }
-  .panel-inner { position: relative; inset: auto; overflow: visible; padding: 0 16px 12px; }
+  /* pan-y: sideways drags on the card reach the swipe handler instead of the browser */
+  .panel-inner { position: relative; inset: auto; overflow: visible; padding: 0 16px 12px; touch-action: pan-y; }
   .panel-section:not(.has-active),
   .panel [data-key]:not(.is-active),
   .group-head, .rule, .panel-foot, .dab-legend, .presets .eyebrow { display: none; }

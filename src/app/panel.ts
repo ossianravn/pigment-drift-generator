@@ -56,6 +56,12 @@ export class Panel {
   private sheetDice!: HTMLButtonElement;
   private sheetLock!: HTMLButtonElement;
   private scrubTimer = 0;
+  /** Control keys in chip-rail order — what a swipe steps through. */
+  private order: string[] = [];
+  private small = matchMedia('(max-width: 760px)');
+  private reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+  /** Completes the step in flight; run early if another swipe arrives before it lands. */
+  private pendingStep: (() => void) | null = null;
 
   constructor(private store: Store, private thumbs: Map<string, string>) {
     this.buildMaster();
@@ -63,11 +69,13 @@ export class Panel {
     this.buildGroups();
     this.buildChips();
     this.buildSheetBar();
+    this.bindSwipe();
     this.focus(this.active);
     this.sync();
-    store.subscribe((_, changed) => {
+    store.subscribe((state, changed) => {
       if (changed.has('config')) this.sync();
       if (changed.has('locked')) this.syncLocks();
+      if (changed.has('panelOpen') && state.panelOpen) this.hintSwipe();
     });
   }
 
@@ -250,6 +258,7 @@ export class Panel {
       const b = el('button', { type: 'button', 'data-target': key, 'aria-pressed': 'false' }, label) as HTMLButtonElement;
       b.addEventListener('click', () => this.focus(key));
       this.chips.set(key, b);
+      this.order.push(key);
       rail.append(b);
     };
     add('presets', 'Presets');
@@ -313,6 +322,129 @@ export class Panel {
       this.sheetDice.setAttribute('aria-label', this.sheetDice.title);
     }
     this.syncLocks();
+  }
+
+  // ---------- swipe between controls (phones) ----------
+
+  private activeEl(): HTMLElement | null {
+    return this.inner.querySelector<HTMLElement>(`[data-key="${this.active}"]`);
+  }
+
+  /**
+   * Swiping sideways on the card steps to the previous/next control. Gestures that start
+   * on sliders, colour dabs or rows that already scroll sideways are left to them.
+   */
+  private bindSwipe(): void {
+    const card = document.getElementById('panel')!;
+    let start: { x: number; y: number; t: number; id: number } | null = null;
+    let swiping = false;
+
+    const follow = (dx: number) => {
+      const el = this.activeEl();
+      if (!el) return;
+      el.style.transform = `translateX(${dx * 0.55}px)`;
+      el.style.opacity = String(1 - Math.min(0.6, Math.abs(dx) / 320));
+    };
+
+    card.addEventListener('pointerdown', (e) => {
+      if (!this.small.matches || !e.isPrimary || e.button !== 0) return;
+      if ((e.target as Element).closest('input, .preset-row, .library, .chips, .dabs, .peek')) return;
+      start = { x: e.clientX, y: e.clientY, t: performance.now(), id: e.pointerId };
+      swiping = false;
+    });
+
+    card.addEventListener('pointermove', (e) => {
+      if (!start || e.pointerId !== start.id) return;
+      const dx = e.clientX - start.x;
+      const dy = e.clientY - start.y;
+      if (!swiping) {
+        // Only clearly horizontal movement becomes a swipe; small jitters stay taps.
+        if (Math.abs(dx) < 10 || Math.abs(dx) < Math.abs(dy) * 1.3) return;
+        swiping = true;
+        // Capturing on the card also means the release can't "click" a button underneath.
+        card.setPointerCapture(e.pointerId);
+      }
+      follow(dx);
+    });
+
+    const finish = (e: PointerEvent, cancelled = false) => {
+      if (!start || e.pointerId !== start.id) return;
+      const dx = e.clientX - start.x;
+      const speed = Math.abs(dx) / Math.max(1, performance.now() - start.t);
+      const wasSwiping = swiping;
+      start = null;
+      swiping = false;
+      if (!wasSwiping) return;
+      const committed = !cancelled && (Math.abs(dx) > 64 || (speed > 0.45 && Math.abs(dx) > 24));
+      this.step(committed ? (dx < 0 ? 1 : -1) : 0);
+    };
+    card.addEventListener('pointerup', (e) => finish(e));
+    card.addEventListener('pointercancel', (e) => finish(e, true));
+  }
+
+  /** Moves the phone card by one control (dir ±1), or settles it back in place (0). */
+  private step(dir: number): void {
+    // A quick second swipe starts from the control the first one was heading to.
+    const pending = this.pendingStep;
+    this.pendingStep = null;
+    pending?.();
+    const el = this.activeEl();
+    const from = { transform: el?.style.transform || 'none', opacity: el?.style.opacity || '1' };
+    const settle = (node: HTMLElement | null) => {
+      if (!node) return;
+      node.style.transform = '';
+      node.style.opacity = '';
+    };
+    const next = dir ? this.order[this.order.indexOf(this.active) + dir] : undefined;
+
+    if (!next) {
+      // Nothing that way (or not far enough): spring back.
+      settle(el);
+      if (el && !this.reducedMotion.matches) {
+        el.animate([from, { transform: 'none', opacity: 1 }], { duration: 240, easing: 'cubic-bezier(.2, .9, .3, 1.2)' });
+      }
+      return;
+    }
+
+    navigator.vibrate?.(6);
+    if (!el || this.reducedMotion.matches) {
+      settle(el);
+      this.focus(next);
+      return;
+    }
+    const out = el.animate([from, { transform: `translateX(${-dir * 56}px)`, opacity: 0 }], { duration: 110, easing: 'ease-in' });
+    const complete = () => {
+      out.cancel();
+      settle(el);
+      this.focus(next);
+      this.activeEl()?.animate(
+        [{ transform: `translateX(${dir * 56}px)`, opacity: 0 }, { transform: 'none', opacity: 1 }],
+        { duration: 220, easing: 'cubic-bezier(.2, .8, .2, 1)' },
+      );
+    };
+    this.pendingStep = complete;
+    out.onfinish = () => {
+      if (this.pendingStep !== complete) return;
+      this.pendingStep = null;
+      complete();
+    };
+  }
+
+  /** The first time the card opens on a phone, nudge the control so the swipe is discoverable. */
+  hintSwipe(): void {
+    if (!this.small.matches || this.reducedMotion.matches) return;
+    try {
+      if (localStorage.getItem('pd-swipe-hint')) return;
+      localStorage.setItem('pd-swipe-hint', '1');
+    } catch {
+      return; // no storage: skip the hint rather than repeat it every time
+    }
+    window.setTimeout(() => {
+      this.activeEl()?.animate(
+        [{ transform: 'none' }, { transform: 'translateX(-18px)' }, { transform: 'translateX(4px)' }, { transform: 'none' }],
+        { duration: 900, easing: 'ease-in-out', delay: 250 },
+      );
+    }, 450);
   }
 
   // ---------- glass while dragging ----------
