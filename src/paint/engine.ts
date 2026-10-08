@@ -416,6 +416,7 @@ export class PaintEngine {
       gl.uniform1f(u.uBleed, bleed);
       gl.uniform1f(u.uDryKeep, Math.exp(-dt / (0.7 + 2.2 * bleed)));
       gl.uniform2f(u.uSeedOff, this.meta.seed[0], this.meta.seed[1]);
+      gl.uniform1f(u.uUnit, this.meta.unit * this.k);
       gl.uniform1i(u.uDropCount, nd);
       gl.uniform4fv(u.uDrop, this.dropBuf);
       gl.uniform4fv(u.uDropInk, this.dropInkBuf);

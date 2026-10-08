@@ -91,7 +91,7 @@ Each export downloads as a zip pack with the files, copy-paste HTML/CSS, an `exa
 | --- | --- |
 | **Tap** | A drop of pigment blooms and pushes the washes around it outward. Tap the same spot with other pigments for suminagashi-style rings. |
 | **Hold** | The drop keeps growing for as long as you hold. |
-| **Drag** | A brush stroke. Wet edges bleed, then dry into the same stacked washes, darker rims and granulation as the generator. |
+| **Drag** | A brush stroke, laid down like the generator's washes: a firm core that thins out through feathered edges into mist. Wet edges bleed, then dry into the same stacked washes, darker rims and granulation. |
 | **Water** | Stir and comb the floating pigment into marbled folds, or tap to drop clear water. |
 | **Blot** | Lifts pigment back off the paper. |
 

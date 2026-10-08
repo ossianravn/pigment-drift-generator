@@ -6,8 +6,11 @@ import { PALETTES, type Palette } from '../engine/palettes';
 import type { Tool } from './brush';
 import { type Look, MAX_INKS } from './engine';
 
-/** Pigment each pan lays down, deepest -> palest: where the wash stack shows that pan's own color. */
-export const PAN_INK = [0.95, 0.8, 0.54, 0.35, 0.12];
+/**
+ * Pigment each pan lays down, deepest -> palest: mid-way between the wash stack's
+ * thresholds, so each pan shows its own color and its soft edges don't eat into it.
+ */
+export const PAN_INK = [0.97, 0.78, 0.6, 0.42, 0.2];
 export const PAN_NAMES = ['Deepest', 'Deep', 'Middle', 'Light', 'Palest'];
 /** Brush radii (CSS px) the size button steps through. */
 export const SIZES = [7, 14, 24, 42];

@@ -67,6 +67,22 @@ float fbm(vec2 p, int octaves) {
 }
 `;
 
+/**
+ * Pigment amount <-> the generator's wash height (0 = deepest, 1 = the palest wash's
+ * edge). The last sliver of pigment stands for the mist above that edge, up to bare
+ * paper at H_BARE, so soft edges and haze fade out before the pigment runs out.
+ */
+const HEIGHT = /* glsl */ `
+const float P_EDGE = 0.08 / 1.08;
+const float H_BARE = 1.4;
+float heightOf(float p) {
+  return p >= P_EDGE ? 1.08 - 1.08 * p : H_BARE - (H_BARE - 1.0) * p / P_EDGE;
+}
+float pigmentOf(float h) {
+  return h <= 1.0 ? (1.08 - h) / 1.08 : P_EDGE * max(H_BARE - h, 0.0) / (H_BARE - 1.0);
+}
+`;
+
 // ---------------------------------------------------------------- utilities
 
 /**
@@ -283,6 +299,7 @@ uniform float uFlowing;
 uniform float uBleed;        // 0..1 how far wet pigment spreads
 uniform float uDryKeep;      // wetness multiplier this step
 uniform vec2 uSeedOff;
+uniform float uUnit;         // one sheet unit, in field texels
 
 const int MAX_DROPS = 4;
 uniform int uDropCount;
@@ -379,26 +396,50 @@ void main() {
     f.y = max(f.y, (inkKind < 0.5 ? 0.3 : 0.45) * inkCov);
   }
 
+  // Brush texture, worked out once per texel the first time a brush comes near.
+  float rag = 0.0, swell = 0.0, bloom = 0.0;
+  bool shaped = false;
   for (int i = 0; i < MAX_SEGS; i++) {
     if (i >= uSegCount) break;
     vec4 sp = uSegP[i];
     float t;
     float d = segDist(q, uSeg[i], t);
-    if (d > sp.x * 1.6) continue;
+    if (d > sp.x * 2.2) continue;
+    if (!shaped) {
+      vec2 S = q / uUnit;
+      // Ragged like the generator's washes: billows, fringes and fine tatters.
+      rag = fbm(S * 5.0 + uSeedOff, 3) * 0.45 + gnoise(q * 0.05 + uSeedOff.yx) * 0.13 + gnoise(q * 0.16 + 7.0) * 0.05;
+      // Never quite even inside: the load swells and thins like its turbulence.
+      swell = fbm(S * 3.0 + uSeedOff.yx + 4.4, 2) * 0.7 + gnoise(S * 9.0 + uSeedOff + 1.9) * 0.3;
+      // And the paper takes the water unevenly, so the edge softens in some places more than others.
+      bloom = smoothstep(-0.4, 0.4, gnoise(S * 2.2 + uSeedOff * 0.7 + 11.0));
+      shaped = true;
+    }
     float kind = mod(sp.w, 4.0);
     float slot = floor(sp.w / 4.0);
-    // Ragged edge and dry-brush streaks running along the stroke.
-    float rag = gnoise(q * 0.05 + uSeedOff) * 0.16 + gnoise(q * 0.16 + 7.0) * 0.05;
     float dn = d / sp.x + rag;
     float cov = 1.0 - smoothstep(0.5, 1.0, dn);
+    // Dry-brush streaks run along the stroke.
     vec2 ab = uSeg[i].zw - uSeg[i].xy;
     float side = dot(q - uSeg[i].xy, vec2(-ab.y, ab.x)) / max(length(ab), 1e-3) / sp.x;
     float bristle = length(ab) > 0.5 ? 0.7 + 0.6 * smoothstep(-0.4, 0.4, gnoise(vec2(side * 3.2, 0.5) + uSeedOff)) : 1.0;
     if (kind < 0.5) {
-      float k = clamp(cov * sp.z * bristle, 0.0, 1.0);
-      f.x = mix(f.x, sp.y, k);
-      f.zw = mix(f.zw, inkOf(slot, sp.y), k);
-      f.y = max(f.y, (1.0 - smoothstep(0.75, 1.4, dn)) * 0.95);
+      float tgt = max(sp.y + (0.04 + 0.08 * sp.y) * swell, 0.0);
+      // The core takes the pan's pigment (and can lighten what's there)...
+      float k = clamp((1.0 - smoothstep(0.2, 0.55, dn)) * sp.z * bristle, 0.0, 1.0);
+      f.x = mix(f.x, tgt, k);
+      f.zw = mix(f.zw, inkOf(slot, tgt), k);
+      // ...and around it the wash thins out the way the generator's do: a firm edge
+      // for deep pigment, then a pale skirt that fades into mist, wider where the
+      // paper drinks more. It only adds.
+      float skirt = (0.08 + 0.14 * bloom) * (1.0 - 0.5 * smoothstep(0.3, 0.9, sp.y));
+      float shape = 1.1 * (1.0 - smoothstep(0.4, 1.0, dn)) + skirt * (1.0 - smoothstep(0.7, 1.2 + 0.6 * bloom, dn));
+      float add = min(tgt, shape) - f.x;
+      if (add > 0.0) {
+        f.x += add;
+        f.zw += inkOf(slot, add);
+      }
+      f.y = max(f.y, (1.0 - smoothstep(1.0, 1.8, dn)) * 0.95);
     } else if (kind < 1.5) {
       f.y = max(f.y, (1.0 - smoothstep(0.6, 1.25, dn)) * 0.45);
     } else {
@@ -421,7 +462,7 @@ void main() {
  * field (and its current) converted to pigment, so "Paint this" picks up the
  * piece you were looking at.
  */
-export const COMPOSE = HEAD + NOISE + /* glsl */ `
+export const COMPOSE = HEAD + NOISE + HEIGHT + /* glsl */ `
 uniform vec2 uView;       // the viewport, in field texels
 uniform vec2 uViewOff;    // its bottom-left corner inside the field
 uniform vec2 uSeedOff;
@@ -467,11 +508,11 @@ void main() {
     fbm(Q * 1.7 + 1.6 * q + uSeedOff + vec2(8.3, 2.8) - orb2, 3));
   vec2 W = P + uWarp * uScale * vec2(0.22, 0.12) * (r + 0.5 * q);
   float rag = fbm(Q * 5.0 + uSeedOff * 1.3 + r * 0.7, 5);
-  float depth = W.y + uFeather * uScale * rag * 0.07;
+  float ragFine = gnoise(Q * 40.0 + uSeedOff + r * 3.0);
+  float depth = W.y + uFeather * uScale * (rag * 0.07 + ragFine * 0.01);
   float turb = fbm(W * 1.2 / uScale + q * 0.3 + uSeedOff + vec2(4.4, 1.9) + orb * 0.4, 5);
   float slope = (hash12(uSeedOff * 0.73) - 0.5) * 1.1;
   float H = depth / hz + uRidge * (0.55 * turb + slope * W.x * 0.45 / hz);
-  float pig = (1.08 - H) / 1.08;
 
   if (uRiver > 0.001) {
     float rBase = hz * mix(0.08, 0.8, uRiverDepth);
@@ -483,12 +524,15 @@ void main() {
     float persp = clamp(1.0 - yc / hz, 0.0, 1.0);
     float width = uRiverWidth * uScale * mix(0.12, 1.05, persp);
     width *= 0.7 + 0.6 * smoothstep(-0.5, 0.5, gnoise(vec2(x * 2.2 / uScale, 9.1) + uSeedOff));
-    float ad = abs(dist) + rag * 0.025 * uFeather * uScale;
+    float ad = abs(dist) + (rag * 0.025 + ragFine * 0.006) * uFeather * uScale + 0.4 * ragFine * width * 0.22;
     float fade = smoothstep(hz * 1.08, hz * 0.65, yc) * smoothstep(-0.05, 0.05, yc);
-    float lift = (1.0 - smoothstep(width * 0.5, width, ad)) * fade * uRiver;
-    pig = mix(pig, min(pig, 0.11), clamp(lift, 0.0, 1.0));
+    // A wider bank than the generator's: the washes cut it a little crisper.
+    float lift = (1.0 - smoothstep(width * 0.35, width * 1.15, ad)) * fade * uRiver;
+    // The lifted current keeps a pale tint of pigment, like the generator's: just
+    // inside the palest wash nearby, fading to haze in the distance.
+    H = mix(H, max(H, 0.985 + 0.08 * (1.0 - persp)), clamp(lift, 0.0, 1.0));
   }
-  o = vec4(clamp(pig, 0.0, 1.3), 0.0, 0.0, 0.0);
+  o = vec4(clamp(pigmentOf(H), 0.0, 1.3), 0.0, 0.0, 0.0);
 }
 `;
 
@@ -575,10 +619,10 @@ void main() {
 
 /**
  * The look: the generator's wash stack, fed by the painted field instead of
- * procedural noise. Bare paper stays bare; wet paint shows soft edges that
- * sharpen and pool into darker rims as they dry.
+ * procedural noise. Bare paper stays bare; edges are as soft as the generator's
+ * (softer still while wet) and pool into darker rims as they dry.
  */
-export const RENDER = HEAD + MAPPING + /* glsl */ `
+export const RENDER = HEAD + MAPPING + HEIGHT + /* glsl */ `
 uniform sampler2D uField;
 uniform sampler2D uPaperTex;
 uniform sampler2D uFlow0;
@@ -629,7 +673,7 @@ float hash12(vec2 p) {
   return fract((p3.x + p3.y) * p3.z);
 }
 
-float pigAt(vec2 t) { return texture(uField, t / uFieldSize).x; }
+float hAt(vec2 t) { return heightOf(texture(uField, t / uFieldSize).x); }
 
 void main() {
   vec2 frag = gl_FragCoord.xy;
@@ -644,14 +688,12 @@ void main() {
   float wet = fv.y;
   vec2 other = pv > 1e-4 ? clamp(fv.zw / pv, 0.0, 1.0) : vec2(0.0);
   inkShare = vec3(max(1.0 - other.x - other.y, 0.0), other);
-  vec2 g = vec2(pigAt(at + vec2(1.0, 0.0)) - pigAt(at - vec2(1.0, 0.0)),
-                pigAt(at + vec2(0.0, 1.0)) - pigAt(at - vec2(0.0, 1.0))) * 0.5 * uUnit;
 
   float edgeN = paperT.r * 2.0 - 1.0;
   vec3 col = uPaper;
   float pig = 0.0;
 
-  if (pv > 0.002 || length(g) > 0.01) {
+  if (pv > 1e-4) {
     vec4 f1 = texture(uFlow1, suv);
     vec4 f2 = texture(uFlow2, suv);
     float rag = f0.z;
@@ -660,13 +702,27 @@ void main() {
     float paperLum = dot(uPaper, vec3(0.2126, 0.7152, 0.0722));
     // Organic wobble on the slopes only: bare paper stays bare, solid cores stay solid.
     float body = clamp(pv * (1.25 - pv) * 3.2, 0.0, 1.0);
-    float H = 1.08 - 1.08 * pv + (uRidge * 0.1 * turb + uFeather * 0.035 * rag) * body;
-    float gH = max(length(g) * 1.08, 1.6);
+    float H = heightOf(pv) + (uRidge * 0.1 * turb + uFeather * 0.035 * rag) * body;
+    // How fast the height changes, per sheet unit (the generator's is about 1.8).
+    vec2 g = vec2(hAt(at + vec2(1.0, 0.0)) - hAt(at - vec2(1.0, 0.0)),
+                  hAt(at + vec2(0.0, 1.0)) - hAt(at - vec2(0.0, 1.0))) * 0.5 * uUnit;
+    float slope = length(g);
+    float gH = max(slope, 1.6);
+    // Softness is the generator's, measured in height, scaled by how steeply the
+    // pigment falls toward each wash's own edge (looked at a few texels out). A
+    // steep bank melts the washes it cuts through instead of leaving a rim of each
+    // one's color, while a flat wash beside it stays whole, and flat pigment (which
+    // the generator never has) stays crisp instead of dissolving into grain.
+    float H0 = heightOf(pv);
+    vec2 dir = slope > 1e-3 ? g / slope : vec2(0.0);
+    float slopeUp = max(hAt(at + dir * 4.0) - H0, 0.0) * uUnit / 4.0;
+    float slopeDown = max(H0 - hAt(at - dir * 4.0), 0.0) * uUnit / 4.0;
+    // Crisp edges catch on the paper's tooth, a pixel or two either way.
+    float tooth = edgeN * 0.0025 * min(slope, 40.0);
     float dry = 1.0 - smoothstep(0.0, 0.5, wet);
 
     int L = uLayers;
     float denom = float(max(L - 1, 1));
-    float firstWash = 0.0;
     for (int i = 0; i < 7; i++) {
       if (i >= L) break;
       float fl = float(i);
@@ -674,17 +730,21 @@ void main() {
       float ph = fl * 2.4;
       float thr = mix(1.0, 0.14, pow(fi, 0.85));
       float own = f2.x * cos(ph) + f2.y * sin(ph);
-      float inside = (thr + 0.03 * own * body - H) / gH;
+      float dH = thr + 0.03 * own * body - H;
 
-      float soft = mix(0.009, 0.0035, fi) * (0.5 + 1.2 * uMist * (1.0 - fi));
-      soft *= mix(0.5, 1.8, smoothstep(-0.45, 0.45, f1.w + 0.35 * sin(fl * 2.3)));
-      soft *= 1.0 + 3.0 * wet;
-      float m = smoothstep(-soft, soft, inside + soft * 0.9 * edgeN);
-      if (i == 0) firstWash = m;
+      float soft = mix(0.05, 0.012, fi) * (0.4 + 1.2 * uMist * (1.0 - fi));
+      soft *= mix(0.4, 2.0, smoothstep(-0.45, 0.45, f1.w + 0.35 * sin(fl * 2.3)));
+      soft *= 1.0 + wet;
+      float toward = min(slope, mix(slopeDown, slopeUp, smoothstep(-0.03, 0.03, thr - H)));
+      float sH = min(soft * clamp(toward, 0.35, 8.0), 0.19);
+      float m = smoothstep(-sH, sH, dH + sH * 0.9 * edgeN + tooth);
       if (m <= 0.0) continue;
+      float inside = dH / gH;
 
       float wash = 0.82 + 0.28 * (f2.z * cos(ph * 1.3 + 1.0) + f2.w * sin(ph * 1.3 + 1.0));
-      float pool = uEdge * dry * exp(-max(inside, 0.0) / (0.006 + soft * 0.5));
+      // Pigment pools along the rim, measured in height like the generator's, so a
+      // steep edge (a lifted current, a stroke) gets a hairline, not a dark band.
+      float pool = uEdge * dry * exp(-max(dH, 0.0) / (0.022 + 0.5 * sH)) * min(1.0, 3.0 / gH);
       float a = clamp(m * (wash * mix(0.7, 1.15, fi) * uDensity + 0.4 * pool), 0.0, 1.0);
 
       float idx = mix(clamp(H, 0.0, 1.1) * 3.8, (1.0 - fi) * 3.6 + 0.2, 0.35);
@@ -701,11 +761,15 @@ void main() {
 
     col *= 1.0 - pig * (0.16 * rag + 0.12 * f1.y);
 
-    // Mist: pigment too thin to make a wash hangs around it as a granular haze.
-    float wisp = smoothstep(-0.25, 0.55, f1.z + 0.2) * (0.75 + 0.5 * edgeN);
-    float fringe = smoothstep(0.0, 0.07, pv) * (1.0 - firstWash);
+    // Mist, as in the generator: a granular haze where the palest wash dissolves
+    // into paper, and a veil over the far washes.
+    float mistN = f1.z;
+    float mistBand = 1.0 - smoothstep(-0.05, 0.06 + 0.3 * uMist, H - 1.0 + mistN * 0.12);
+    float wisp = smoothstep(-0.25, 0.55, mistN + 0.2) * (0.75 + 0.5 * edgeN);
     vec3 mistCol = mix(uPaper, pigment(3.5 + uHueDrift * driftN * 1.5), 0.55);
-    col = mix(col, mistCol, clamp(fringe * wisp * (0.25 + uMist) * 0.6, 0.0, 1.0));
+    col = mix(col, mistCol, clamp(mistBand * wisp * uMist * 0.6 * (1.0 - pig), 0.0, 1.0));
+    float veil = smoothstep(0.5, 1.02, H) * wisp;
+    col = mix(col, mistCol, clamp(veil * uMist * 0.28 * pig, 0.0, 1.0));
 
     // Wet paint reads a little deeper.
     col *= 1.0 - 0.08 * wet * pig;
